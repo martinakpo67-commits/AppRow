@@ -254,29 +254,49 @@ def integrate_file(filepath, filename):
             col = cm.get(field)
             return str(ws_in.cell(row=r, column=col).value or '').strip() if col else ''
 
+        def find_tel(r, base_col):
+            """Cherche le téléphone dans col, col+1, col-1, col+2."""
+            if not base_col: return ''
+            for delta in [0, 1, -1, 2]:
+                v = str(ws_in.cell(row=r, column=base_col+delta).value or '').strip()
+                if v and re.search(r'\d{5,}', v.replace(' ','')):
+                    return v
+            return ''
+
         # Format principal
         quartier = gv(col_map, 'quartier')
-        nom      = gv(col_map, 'nom').strip()
-        prenom   = gv(col_map, 'prenom').strip()
-        tel_raw  = (gv(col_map, 'telephone') or gv(col_map, 'adresse')).strip()
+        # Quartier peut aussi être en col+1 (ex: col5 au lieu col4)
+        if not quartier:
+            col_q = col_map.get('quartier', 4)
+            v_next = str(ws_in.cell(row=r, column=col_q+1).value or '').strip()
+            skip_vals = {'N°','NOM','NOMS','PRENOM','PRENOMS','PROFESSION','ADRESSE COMPLETE','CONTACT','QUARTIER'}
+            if v_next and v_next.upper() not in skip_vals and not re.match(r'^\d+$', v_next):
+                quartier = v_next
+
+        nom     = gv(col_map, 'nom').strip()
+        prenom  = gv(col_map, 'prenom').strip()
+        # Téléphone: chercher dans col_tel et colonnes adjacentes
+        tel_col = col_map.get('telephone') or col_map.get('adresse')
+        tel_raw = find_tel(r, tel_col)
 
         # Format alternatif décalé (si détecté et ligne principale vide)
         if alt_map and not nom:
-            q2  = gv(alt_map, 'quartier')
-            n2  = gv(alt_map, 'nom').strip()
-            p2  = gv(alt_map, 'prenom').strip()
-            t2  = (gv(alt_map, 'telephone') or gv(alt_map, 'adresse')).strip()
+            q2  = str(ws_in.cell(row=r, column=alt_map.get('quartier',99)).value or '').strip()
+            n2  = str(ws_in.cell(row=r, column=alt_map.get('nom',99)).value or '').strip()
+            p2  = str(ws_in.cell(row=r, column=alt_map.get('prenom',99)).value or '').strip()
             if n2:
-                if q2: quartier = q2
+                if q2 and not quartier: quartier = q2
                 nom     = n2
                 prenom  = p2
-                tel_raw = t2
+                if not tel_raw:
+                    alt_tel_col = alt_map.get('telephone') or alt_map.get('adresse')
+                    tel_raw = find_tel(r, alt_tel_col)
 
         return quartier, nom, prenom, tel_raw, {
-            'partis':         gv(col_map, 'partis') or (gv(alt_map, 'partis') if alt_map else ''),
-            'profession':     gv(col_map, 'profession') or (gv(alt_map, 'profession') if alt_map else ''),
-            'date_naissance': gv(col_map, 'date_naissance') or (gv(alt_map, 'date_naissance') if alt_map else ''),
-            'lieu_naissance': gv(col_map, 'lieu_naissance') or (gv(alt_map, 'lieu_naissance') if alt_map else ''),
+            'partis':         gv(col_map, 'partis'),
+            'profession':     gv(col_map, 'profession'),
+            'date_naissance': gv(col_map, 'date_naissance'),
+            'lieu_naissance': gv(col_map, 'lieu_naissance'),
         }
     # ────────────────────────────────────────────────────────────────────────
 
