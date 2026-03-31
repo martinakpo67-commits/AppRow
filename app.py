@@ -226,9 +226,10 @@ def integrate_file(filepath, filename):
         return str(ws_in.cell(row=r, column=col).value or '').strip() if col else ''
 
     # Collect all valid persons first (fast pass, no Excel writes)
-    persons   = []
-    rejected  = []
+    persons     = []
+    rejected    = []
     seen_phones = set()
+    last_quartier = None   # ← propagation du quartier
 
     for r in range(header_row + 1, ws_in.max_row + 1):
         quartier = get(r, 'quartier')
@@ -237,8 +238,21 @@ def integrate_file(filepath, filename):
         tel_raw  = (get(r, 'telephone') or get(r, 'adresse')).strip()
         tel      = clean_phone(tel_raw)
 
-        if normalize(nom) in ['nom','noms','name','']: continue
-        if not any([quartier, nom, prenom, tel_raw]):  continue
+        # Ignorer les lignes totalement vides
+        if not any([quartier, nom, prenom, tel_raw]): continue
+        # Ignorer les lignes d'en-tête répétées
+        if normalize(nom) in ['nom','noms','name']: continue
+
+        # ── PROPAGATION DU QUARTIER ──────────────────────────────────────
+        # Si le quartier est renseigné sur cette ligne → il devient le dernier quartier connu
+        if quartier:
+            last_quartier = quartier
+        # Si pas de quartier mais nom+prénom+tel présents → hériter du dernier quartier
+        elif not quartier and nom and prenom and tel:
+            if last_quartier:
+                quartier = last_quartier   # héritage
+            # sinon : pas de quartier connu → sera rejeté ci-dessous
+        # ────────────────────────────────────────────────────────────────
 
         missing = []
         if not quartier: missing.append('Quartier')
@@ -293,10 +307,11 @@ def integrate_file(filepath, filename):
                 actual_last    = last_row + row_offset
 
                 if filled < 5:
-                    target_row = actual_row_num + filled
+                    # Use existing pre-formatted slot row
+                    target_row    = actual_row_num + filled
                     overflow_flag = False
                 else:
-                    # Insert new row after last_row
+                    # Capacity exceeded → insert a brand new row
                     target_row = actual_last + 1
                     ws_out.insert_rows(target_row)
                     style_data_row(ws_out, target_row, C_NEW)
