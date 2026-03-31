@@ -284,26 +284,52 @@ def integrate_file(filepath, filename):
     persons     = []
     rejected    = []
     seen_phones = set()
-    last_quartier = None   # ← propagation du quartier
+    last_quartier = None
 
-    for r in range(header_row + 1, ws_in.max_row + 1):
+    for r in range(1, ws_in.max_row + 1):
+
+        # ── REGLE 1 : Ligne "QUARTIER : NOM" ─────────────────────────────
+        for c in range(1, min(ws_in.max_column + 1, 6)):
+            cell_val = str(ws_in.cell(row=r, column=c).value or '').strip()
+            m = re.match(r'^QUARTIER\s*[:\-]\s*(.+)', cell_val, re.IGNORECASE)
+            if m:
+                last_quartier = m.group(1).strip()
+                break
+            if re.match(r'^QUARTIER\s*[:\-]?\s*$', cell_val, re.IGNORECASE):
+                nxt = str(ws_in.cell(row=r, column=c+1).value or '').strip()
+                if nxt: last_quartier = nxt
+                break
+        # ─────────────────────────────────────────────────────────────────
+
+        if r < header_row + 1:
+            continue
+
         quartier, nom, prenom, tel_raw, extras = get_row_data(r)
         tel = clean_phone(tel_raw)
 
-        # Ignorer les lignes totalement vides
+        # Ignorer lignes vides
         if not any([quartier, nom, prenom, tel_raw]): continue
-        # Ignorer les lignes d'en-tête répétées
+        # Ignorer en-têtes répétés
         if normalize(nom) in ['nom','noms','name']: continue
-        # Ignorer les lignes de structure (DEPARTEMENT, ARRONDISSEMENT)
-        if normalize(quartier) == '' and normalize(nom) == '' and normalize(prenom) == '': continue
+        if normalize(prenom) in ['prenom','prénom','prenoms','prénoms']: continue
+        # Ignorer lignes QUARTIER: (déjà traitées)
+        first_cell = str(ws_in.cell(row=r, column=1).value or '').strip()
+        if re.match(r'^QUARTIER\s*[:\-]', first_cell, re.IGNORECASE): continue
+        # Ignorer lignes de structure
+        skip = False
+        for c in range(1, min(ws_in.max_column+1, 4)):
+            cv = str(ws_in.cell(row=r, column=c).value or '').strip().upper()
+            if cv.startswith('DEPARTEMENT') or 'ARRONDISSEMENT' in cv or cv.startswith('COMMUNE'):
+                skip = True; break
+        if skip or not nom: continue
 
-        # ── PROPAGATION DU QUARTIER ──────────────────────────────────────
+        # ── REGLE 2 : Propagation du quartier ────────────────────────────
         if quartier:
             last_quartier = quartier
         elif not quartier and nom and (prenom or tel):
             if last_quartier:
                 quartier = last_quartier
-        # ────────────────────────────────────────────────────────────────
+        # ─────────────────────────────────────────────────────────────────
 
         missing = []
         if not quartier: missing.append('Quartier')
