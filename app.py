@@ -225,6 +225,61 @@ def integrate_file(filepath, filename):
         col = col_map.get(field)
         return str(ws_in.cell(row=r, column=col).value or '').strip() if col else ''
 
+    # ── Détection du format double-colonne (colonnes décalées) ──────────────
+    # Certains fichiers ont 2 jeux de colonnes décalés d'1 vers la droite
+    # Ex: Nom col5 + Prénom col7 + Tél col12  ET  Nom col6 + Prénom col8 + Tél col13
+    # On détecte en vérifiant si des lignes de données utilisent col+1
+    def detect_alt_cols(col_map, ws_in, header_row):
+        """Retourne un col_map alternatif décalé de +1 si ce format existe."""
+        alt = {}
+        for field, col in col_map.items():
+            alt[field] = col + 1
+        # Vérifier que le format alternatif existe dans les données
+        sample_rows = 0
+        alt_rows    = 0
+        for r in range(header_row + 1, min(header_row + 50, ws_in.max_row + 1)):
+            nom_main = str(ws_in.cell(row=r, column=col_map.get('nom', 99)).value or '').strip()
+            nom_alt  = str(ws_in.cell(row=r, column=alt.get('nom', 99)).value or '').strip()
+            if nom_main: sample_rows += 1
+            if nom_alt and not nom_main: alt_rows += 1
+        if alt_rows > 0:
+            return alt
+        return None
+
+    alt_map = detect_alt_cols(col_map, ws_in, header_row)
+
+    def get_row_data(r):
+        """Extrait les données d'une ligne, en essayant le format principal puis alternatif."""
+        def gv(cm, field):
+            col = cm.get(field)
+            return str(ws_in.cell(row=r, column=col).value or '').strip() if col else ''
+
+        # Format principal
+        quartier = gv(col_map, 'quartier')
+        nom      = gv(col_map, 'nom').strip()
+        prenom   = gv(col_map, 'prenom').strip()
+        tel_raw  = (gv(col_map, 'telephone') or gv(col_map, 'adresse')).strip()
+
+        # Format alternatif décalé (si détecté et ligne principale vide)
+        if alt_map and not nom:
+            q2  = gv(alt_map, 'quartier')
+            n2  = gv(alt_map, 'nom').strip()
+            p2  = gv(alt_map, 'prenom').strip()
+            t2  = (gv(alt_map, 'telephone') or gv(alt_map, 'adresse')).strip()
+            if n2:
+                if q2: quartier = q2
+                nom     = n2
+                prenom  = p2
+                tel_raw = t2
+
+        return quartier, nom, prenom, tel_raw, {
+            'partis':         gv(col_map, 'partis') or (gv(alt_map, 'partis') if alt_map else ''),
+            'profession':     gv(col_map, 'profession') or (gv(alt_map, 'profession') if alt_map else ''),
+            'date_naissance': gv(col_map, 'date_naissance') or (gv(alt_map, 'date_naissance') if alt_map else ''),
+            'lieu_naissance': gv(col_map, 'lieu_naissance') or (gv(alt_map, 'lieu_naissance') if alt_map else ''),
+        }
+    # ────────────────────────────────────────────────────────────────────────
+
     # Collect all valid persons first (fast pass, no Excel writes)
     persons     = []
     rejected    = []
@@ -232,26 +287,22 @@ def integrate_file(filepath, filename):
     last_quartier = None   # ← propagation du quartier
 
     for r in range(header_row + 1, ws_in.max_row + 1):
-        quartier = get(r, 'quartier')
-        nom      = get(r, 'nom').strip()
-        prenom   = get(r, 'prenom').strip()
-        tel_raw  = (get(r, 'telephone') or get(r, 'adresse')).strip()
-        tel      = clean_phone(tel_raw)
+        quartier, nom, prenom, tel_raw, extras = get_row_data(r)
+        tel = clean_phone(tel_raw)
 
         # Ignorer les lignes totalement vides
         if not any([quartier, nom, prenom, tel_raw]): continue
         # Ignorer les lignes d'en-tête répétées
         if normalize(nom) in ['nom','noms','name']: continue
+        # Ignorer les lignes de structure (DEPARTEMENT, ARRONDISSEMENT)
+        if normalize(quartier) == '' and normalize(nom) == '' and normalize(prenom) == '': continue
 
         # ── PROPAGATION DU QUARTIER ──────────────────────────────────────
-        # Si le quartier est renseigné sur cette ligne → il devient le dernier quartier connu
         if quartier:
             last_quartier = quartier
-        # Si pas de quartier mais nom+prénom+tel présents → hériter du dernier quartier
-        elif not quartier and nom and prenom and tel:
+        elif not quartier and nom and (prenom or tel):
             if last_quartier:
-                quartier = last_quartier   # héritage
-            # sinon : pas de quartier connu → sera rejeté ci-dessous
+                quartier = last_quartier
         # ────────────────────────────────────────────────────────────────
 
         missing = []
@@ -269,9 +320,10 @@ def integrate_file(filepath, filename):
             continue
         seen_phones.add(tel)
         persons.append({'row': r, 'quartier': quartier, 'nom': nom, 'prenom': prenom,
-                        'partis': get(r,'partis'), 'profession': get(r,'profession'),
-                        'date_naissance': get(r,'date_naissance'),
-                        'lieu_naissance': get(r,'lieu_naissance'),
+                        'partis':         extras['partis'],
+                        'profession':     extras['profession'],
+                        'date_naissance': extras['date_naissance'],
+                        'lieu_naissance': extras['lieu_naissance'],
                         'telephone': tel_raw, 'tel_clean': tel})
 
     # Now do all Excel writes in one lock
