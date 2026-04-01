@@ -577,9 +577,18 @@ print("  🚀 Villages & Quartiers Bénin — Système v3")
 print("  ➜  http://localhost:5000")
 print("="*55)
 
-# Pre-build index at startup
-with app.app_context():
-    get_db()
+# Verify mere.xlsx exists at startup
+if not os.path.exists(MERE_PATH):
+    print(f"❌ ERREUR : fichier mère introuvable : {MERE_PATH}")
+    print(f"   Fichiers présents : {os.listdir(BASE_DIR)}")
+else:
+    print(f"✅ Fichier mère trouvé : {MERE_PATH}")
+    # Pre-build index at startup
+    try:
+        with app.app_context():
+            get_db()
+    except Exception as e:
+        print(f"⚠️  Index non construit au démarrage : {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
