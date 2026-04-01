@@ -422,56 +422,71 @@
     document.getElementById('btn-process').disabled = false;
   }
 
-  // ── Process files ────────────────────────────────────────────────────────
+  // ── Process files ONE BY ONE (avoid timeout) ────────────────────────────
   async function processFiles() {
     if (!selectedFiles.length) return;
     const btn  = document.getElementById('btn-process');
     const btxt = document.getElementById('btn-text');
     btn.disabled = true;
-    btxt.innerHTML = '<div class="spinner"></div> Traitement en cours…';
 
-    const form = new FormData();
-    selectedFiles.forEach(f => form.append('files', f));
+    const allResults = [];
+    const total = selectedFiles.length;
 
-    // Mark all as processing
-    selectedFiles.forEach((_, i) => {
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const f = selectedFiles[i];
+      btxt.innerHTML = `<div class="spinner"></div> Fichier ${i+1}/${total} : ${f.name.substring(0,30)}…`;
+
+      // Mark as processing
       const el = document.getElementById('fi-' + i);
       if (el) el.classList.add('processing');
-    });
 
-    try {
-      const resp = await fetch('/upload', { method: 'POST', body: form });
-      const data = await resp.json();
+      const form = new FormData();
+      form.append('files', f);
 
-      if (data.error) { showToast('❌ ' + data.error, 'error'); return; }
+      try {
+        const resp = await fetch('/upload', { method: 'POST', body: form });
 
-      // Guard: ensure results is always an array
-      const results = Array.isArray(data.results) ? data.results : [];
+        // Check if response is HTML (server error)
+        const contentType = resp.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const text = await resp.text();
+          console.error('Server returned HTML:', text.substring(0, 200));
+          allResults.push({ filename: f.name, error: 'Erreur serveur (timeout ou crash)' });
+          if (el) { el.classList.remove('processing'); el.classList.add('error'); }
+          continue;
+        }
 
-      // Mark files done/error
-      results.forEach((r, i) => {
-        const el = document.getElementById('fi-' + i);
+        const data = await resp.json();
+        const results = Array.isArray(data.results) ? data.results : [];
+        const r = results[0] || { filename: f.name, error: 'Réponse vide' };
+        allResults.push(r);
+
         if (el) {
           el.classList.remove('processing');
           el.classList.add(r.error ? 'error' : 'done');
         }
-      });
 
-      if (results.length > 0) {
-        renderResults(results);
+      } catch(e) {
+        allResults.push({ filename: f.name, error: e.message });
+        if (el) { el.classList.remove('processing'); el.classList.add('error'); }
       }
-      loadStats();
-      selectedFiles = [];
-      setTimeout(() => { renderQueue(); }, 1500);
-      const totalIns = results.reduce((s, r) => s + (r.inserted || 0), 0);
-      showToast(`✅ ${totalIns} personne(s) insérée(s) avec succès`, 'success');
 
-    } catch(e) {
-      showToast('❌ Erreur réseau : ' + e.message, 'error');
-    } finally {
-      btn.disabled = false;
-      btxt.textContent = '▶ Lancer le traitement';
+      // Small pause between files
+      if (i < selectedFiles.length - 1) {
+        await new Promise(res => setTimeout(res, 500));
+      }
     }
+
+    // Show all results
+    if (allResults.length > 0) renderResults(allResults);
+    loadStats();
+    selectedFiles = [];
+    setTimeout(() => { renderQueue(); }, 1500);
+    const totalIns = allResults.reduce((s, r) => s + (r.inserted || 0), 0);
+    showToast(`✅ ${totalIns} personne(s) insérée(s) sur ${total} fichier(s)`, 'success');
+
+    btn.disabled = false;
+    btxt.textContent = '▶ Lancer le traitement';
   }
 
   // ── Render results ───────────────────────────────────────────────────────
