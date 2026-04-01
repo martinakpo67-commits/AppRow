@@ -445,8 +445,11 @@
 
       if (data.error) { showToast('❌ ' + data.error, 'error'); return; }
 
+      // Guard: ensure results is always an array
+      const results = Array.isArray(data.results) ? data.results : [];
+
       // Mark files done/error
-      data.results.forEach((r, i) => {
+      results.forEach((r, i) => {
         const el = document.getElementById('fi-' + i);
         if (el) {
           el.classList.remove('processing');
@@ -454,11 +457,13 @@
         }
       });
 
-      renderResults(data.results);
+      if (results.length > 0) {
+        renderResults(results);
+      }
       loadStats();
       selectedFiles = [];
       setTimeout(() => { renderQueue(); }, 1500);
-      const totalIns = data.results.reduce((s, r) => s + (r.inserted || 0), 0);
+      const totalIns = results.reduce((s, r) => s + (r.inserted || 0), 0);
       showToast(`✅ ${totalIns} personne(s) insérée(s) avec succès`, 'success');
 
     } catch(e) {
@@ -471,6 +476,7 @@
 
   // ── Render results ───────────────────────────────────────────────────────
   function renderResults(results) {
+    if (!results || !Array.isArray(results) || results.length === 0) return;
     const panel = document.getElementById('results-panel');
     const body  = document.getElementById('results-body');
     const sub   = document.getElementById('results-sub');
@@ -490,16 +496,17 @@
           <div class="result-body"><p style="color:var(--red)">${r.error}</p></div>
         </div>`;
 
-      const rejetsHtml = r.rejected && r.rejected.length ? `
-        <div class="rejets-title">⚠️ Détail des rejets (${r.rejected_count} total, max 50 affichés)</div>
+      const rejList = Array.isArray(r.rejected) ? r.rejected : [];
+      const rejetsHtml = rejList.length > 0 ? `
+        <div class="rejets-title">⚠️ Détail des rejets (${r.rejected_count || rejList.length} total, max 50 affichés)</div>
         <table class="rejets-table">
           <thead><tr><th>Ligne</th><th>Quartier</th><th>Nom</th><th>Raison</th></tr></thead>
-          <tbody>${r.rejected.map(x => `
+          <tbody>${rejList.map(x => `
             <tr>
-              <td>${x.row}</td>
-              <td>${x.quartier || '—'}</td>
-              <td>${x.nom || '—'}</td>
-              <td><span class="tag ${x.reason.includes('Doublon') ? 'dupl' : 'manq'}">${x.reason}</span></td>
+              <td>${x.row || '—'}</td>
+              <td>${(x.quartier || '—').replace(/</g,'&lt;')}</td>
+              <td>${(x.nom || '—').replace(/</g,'&lt;')}</td>
+              <td><span class="tag ${(x.reason||'').includes('Doublon') ? 'dupl' : 'manq'}">${x.reason || '—'}</span></td>
             </tr>`).join('')}
           </tbody>
         </table>` : '';
