@@ -12,7 +12,30 @@
   --text:#e8edf3; --muted:#6b7d8f;
   --accent:#00d68f; --accent2:#0099ff;
   --warn:#ff6b35; --danger:#ff4757; --yellow:#ffd166;
+  --shadow:rgba(0,0,0,.4);
 }
+/* ── LIGHT MODE ── */
+html.light {
+  --bg:#f0f4f8; --surface:#ffffff; --surface2:#f5f7fa;
+  --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.14);
+  --text:#0f1923; --muted:#7a8a9a;
+  --shadow:rgba(0,0,0,.12);
+}
+html.light .amb { opacity:.12; }
+html.light header { background:rgba(240,244,248,.92); }
+html.light .stats-ribbon { background:rgba(255,255,255,.85); }
+html.light .stat-val { background:linear-gradient(135deg,#0f1923 40%,var(--muted)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+html.light .stat-val.green { background:linear-gradient(135deg,#00a86b,#007a4d); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+html.light .logo-text h1 { color:#0f1923; }
+html.light .btn-ghost { color:var(--muted); border-color:var(--border2); }
+html.light .btn-ghost:hover { background:rgba(0,0,0,.04); color:var(--text); }
+html.light .panel-title,.html.light .res-title { color:#0f1923; }
+html.light .drop-zone { background:rgba(0,0,0,.02); }
+html.light .file-item { background:#f5f7fa; }
+html.light .hist-item { background:#f5f7fa; }
+html.light .result-card { background:#fff; }
+html.light .metric { background:#f5f7fa; }
+html.light .rej-table th { background:#f0f4f8; }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
 
@@ -182,12 +205,13 @@ input[type=file]{display:none;}
     </div>
     <span class="pill">v4</span>
   </div>
-  <div class="h-btns" style="align-items:center;">
+  <div class="h-btns" style="align-items:center;gap:8px;">
     <span style="font-size:12px;color:var(--muted);margin-right:4px;">👤 <span id="h-user"></span></span>
-    <span id="admin-btns" style="display:none">
+    <span id="admin-btns" style="display:none;gap:8px;align-items:center;">
       <button class="btn btn-ghost" onclick="downloadMere()">⬇ Télécharger</button>
       <button class="btn btn-ghost" onclick="resetData()">↺ Réinitialiser</button>
     </span>
+    <button class="btn btn-ghost" id="theme-btn" onclick="toggleTheme()" title="Changer le thème" style="padding:8px 12px;font-size:16px;">🌙</button>
     <button class="btn btn-ghost" onclick="window.location='/logout'">Déconnexion</button>
   </div>
 </header>
@@ -289,7 +313,10 @@ input[type=file]{display:none;}
         </div>
         <div>
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Mot de passe</div>
-          <input type="text" id="new-password" placeholder="Mot de passe" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:Instrument Sans,sans-serif;">
+          <div style="position:relative;">
+            <input type="password" id="new-password" placeholder="Mot de passe" style="width:100%;padding:10px 44px 10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:Instrument Sans,sans-serif;">
+            <button type="button" onclick="toggleNewPw()" id="new-pw-eye" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:0;">👁</button>
+          </div>
         </div>
         <button onclick="createUser()" style="padding:10px 20px;background:var(--accent);border:none;border-radius:8px;color:#000;font-weight:700;cursor:pointer;font-size:13px;transition:all .2s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">Créer</button>
       </div>
@@ -588,6 +615,36 @@ async function deleteUser(username) {
   if (d.ok) { showToast('✅ ' + d.message, 'success'); loadAdminStats(); }
   else showToast('❌ ' + d.error, 'error');
 }
+
+
+function toggleNewPw() {
+  const inp = document.getElementById('new-password');
+  const eye = document.getElementById('new-pw-eye');
+  if (inp.type === 'password') { inp.type='text'; eye.textContent='🙈'; }
+  else { inp.type='password'; eye.textContent='👁'; }
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn  = document.getElementById('theme-btn');
+  if (html.classList.contains('light')) {
+    html.classList.remove('light');
+    btn.textContent = '🌙';
+    localStorage.setItem('theme','dark');
+  } else {
+    html.classList.add('light');
+    btn.textContent = '☀️';
+    localStorage.setItem('theme','light');
+  }
+}
+// Apply saved theme on load
+(function() {
+  if (localStorage.getItem('theme') === 'light') {
+    document.documentElement.classList.add('light');
+    document.getElementById('theme-btn') && (document.getElementById('theme-btn').textContent = '☀️');
+  }
+})();
 
 </script>
 </body>
