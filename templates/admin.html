@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion Utilisateurs — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c10;--surface:#0f1419;--surface2:#161d26;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e8edf3;--muted:#6b7d8f;--accent:#00d68f;--accent2:#0099ff;--warn:#ff6b35;--danger:#ff4757;--yellow:#ffd166;}
+html.light{--bg:#f0f4f8;--surface:#ffffff;--surface2:#f5f7fa;--border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);--text:#0f1923;--muted:#7a8a9a;}
+html.light header{background:rgba(240,244,248,.92);}
+html.light .amb{opacity:.1;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.amb{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(120px);opacity:.25;}
+.a1{width:500px;height:500px;top:-150px;left:-100px;background:radial-gradient(circle,rgba(0,135,81,.5),transparent 70%);}
+.a2{width:400px;height:400px;bottom:-100px;right:5%;background:radial-gradient(circle,rgba(0,153,255,.3),transparent 70%);}
+
+/* header */
+header{position:relative;z-index:10;padding:0 48px;height:72px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(8,12,16,.88);backdrop-filter:blur(20px);}
+.logo{display:flex;align-items:center;gap:16px;}
+.flag-wrap{width:42px;height:28px;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.1);flex-shrink:0;}
+.flag-wrap img{width:100%;height:100%;object-fit:cover;}
+.logo-text h1{font-family:'Cabinet Grotesk',sans-serif;font-size:15px;font-weight:800;color:var(--text);line-height:1.2;}
+.logo-text span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.pill{background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.2);color:var(--warn);font-size:10px;font-weight:600;letter-spacing:.8px;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+.h-btns{display:flex;gap:8px;align-items:center;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:8px;border:none;font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted);}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);}
+.btn-back{background:rgba(0,214,143,.1);border:1px solid rgba(0,214,143,.25);color:var(--accent);font-weight:600;}
+.btn-back:hover{background:rgba(0,214,143,.2);}
+
+/* main */
+main{position:relative;z-index:5;max-width:1300px;margin:0 auto;padding:40px 48px;}
+
+/* stats top */
+.stats-top{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:32px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;}
+.stat-lbl{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.stat-num{font-family:'Cabinet Grotesk',sans-serif;font-size:32px;font-weight:900;line-height:1;}
+.stat-num.green{color:var(--accent);}
+.stat-num.blue{color:var(--accent2);}
+.stat-num.yellow{color:var(--yellow);}
+.stat-num.white{background:linear-gradient(135deg,#fff 40%,var(--muted));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+
+/* grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;}
+
+/* panel */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;animation:fadeUp .4s ease both;}
+.panel-head{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;justify-content:space-between;}
+.ph-left{display:flex;align-items:center;gap:12px;}
+.p-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.p-icon.g{background:rgba(0,214,143,.12);}
+.p-icon.b{background:rgba(0,153,255,.12);}
+.p-icon.o{background:rgba(255,107,53,.12);}
+.panel-title{font-family:'Cabinet Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text);}
+.panel-sub{font-size:12px;color:var(--muted);margin-top:1px;}
+.panel-body{padding:20px 24px;}
+
+/* user cards */
+.users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+.user-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;transition:border-color .2s;}
+.user-card:hover{border-color:var(--border2);}
+.uc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.uc-name{font-family:'Cabinet Grotesk',sans-serif;font-size:15px;font-weight:800;color:var(--text);}
+.uc-del{width:24px;height:24px;border-radius:6px;background:rgba(255,71,87,.1);border:none;cursor:pointer;color:var(--danger);font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.uc-del:hover{background:rgba(255,71,87,.25);}
+.uc-stats{display:flex;gap:16px;}
+.uc-stat-val{font-family:'Cabinet Grotesk',sans-serif;font-size:22px;font-weight:900;line-height:1;}
+.uc-stat-val.g{color:var(--accent);}
+.uc-stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:3px;}
+.uc-last{font-size:11px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+
+/* create form */
+.create-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;}
+.field-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;font-weight:600;}
+.field-wrap{position:relative;}
+input.field{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:'Instrument Sans',sans-serif;transition:border-color .2s;}
+input.field:focus{border-color:var(--accent);}
+input.field::placeholder{color:var(--muted);}
+.pw-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:0;}
+.btn-create{padding:10px 22px;background:var(--accent);border:none;border-radius:8px;color:#000;font-weight:700;cursor:pointer;font-size:13px;transition:all .2s;white-space:nowrap;}
+.btn-create:hover{background:#00f0a0;transform:translateY(-1px);}
+.create-msg{font-size:12px;margin-top:10px;}
+
+/* sessions table */
+.sess-table{width:100%;border-collapse:collapse;font-size:12px;}
+.sess-table th{text-align:left;padding:8px 12px;background:var(--surface2);color:var(--muted);font-weight:600;font-size:10px;letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+.sess-table td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+.sess-table tr:last-child td{border-bottom:none;}
+.sess-table tr:hover td{background:rgba(255,255,255,.02);}
+.u-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;background:rgba(0,153,255,.12);color:var(--accent2);}
+.ins-badge{color:var(--accent);font-weight:600;}
+
+/* empty state */
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:13px;}
+.empty-ico{font-size:32px;opacity:.4;margin-bottom:10px;}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:900px){
+  main{padding:20px 16px;}
+  header{padding:0 16px;}
+  .stats-top{grid-template-columns:repeat(2,1fr);}
+  .grid2{grid-template-columns:1fr;}
+  .create-form{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="amb a1"></div>
+<div class="amb a2"></div>
+
+<header>
+  <div class="logo">
+    <div class="flag-wrap">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Flag_of_Benin.svg/900px-Flag_of_Benin.svg.png" alt="Bénin">
+    </div>
+    <div class="logo-text">
+      <h1>Gestion des utilisateurs</h1>
+      <span>Villages &amp; Quartiers Bénin</span>
+    </div>
+    <span class="pill">👑 Admin</span>
+  </div>
+  <div class="h-btns">
+    <button id="theme-btn" class="btn btn-ghost" onclick="toggleTheme()" style="padding:8px 12px;font-size:16px;">🌙</button>
+    <button class="btn btn-back" onclick="window.location='/'">← Tableau de bord</button>
+    <button class="btn btn-ghost" onclick="window.location='/logout'">Déconnexion</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Stats globales -->
+  <div class="stats-top">
+    <div class="stat-card" style="animation:fadeUp .4s ease .05s both">
+      <div class="stat-lbl">Personnes enregistrées</div>
+      <div class="stat-num green" id="s-pers">—</div>
+    </div>
+    <div class="stat-card" style="animation:fadeUp .4s ease .1s both">
+      <div class="stat-lbl">Total inséré (cumulé)</div>
+      <div class="stat-num white" id="s-cum">—</div>
+    </div>
+    <div class="stat-card" style="animation:fadeUp .4s ease .15s both">
+      <div class="stat-lbl">Sessions de traitement</div>
+      <div class="stat-num blue" id="s-ses">—</div>
+    </div>
+    <div class="stat-card" style="animation:fadeUp .4s ease .2s both">
+      <div class="stat-lbl">Utilisateurs actifs</div>
+      <div class="stat-num yellow" id="s-users">—</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+
+    <!-- Utilisateurs -->
+    <div class="panel" style="animation-delay:.1s">
+      <div class="panel-head">
+        <div class="ph-left">
+          <div class="p-icon g">👥</div>
+          <div>
+            <div class="panel-title">Utilisateurs</div>
+            <div class="panel-sub" id="users-sub">Chargement…</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost" onclick="loadAll()" style="font-size:11px;padding:6px 12px;">↻ Actualiser</button>
+      </div>
+      <div class="panel-body">
+        <div class="users-grid" id="users-grid">
+          <div class="empty"><div class="empty-ico">👤</div>Aucun utilisateur</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Créer un utilisateur -->
+    <div class="panel" style="animation-delay:.15s">
+      <div class="panel-head">
+        <div class="ph-left">
+          <div class="p-icon o">➕</div>
+          <div>
+            <div class="panel-title">Créer un utilisateur</div>
+            <div class="panel-sub">Générer un accès pour un collaborateur</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="create-form">
+          <div>
+            <div class="field-lbl">Prénom</div>
+            <input type="text" id="new-username" class="field" placeholder="Ex: Jean">
+          </div>
+          <div>
+            <div class="field-lbl">Mot de passe</div>
+            <div class="field-wrap">
+              <input type="password" id="new-password" class="field" placeholder="Mot de passe" style="padding-right:40px">
+              <button class="pw-eye" onclick="togglePw()" id="pw-eye">👁</button>
+            </div>
+          </div>
+          <button class="btn-create" onclick="createUser()">Créer</button>
+        </div>
+        <div class="create-msg" id="create-msg"></div>
+
+        <!-- Accès créés dans cette session -->
+        <div id="created-list" style="margin-top:20px;display:none;">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">Accès créés</div>
+          <div id="created-items"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sessions récentes -->
+  <div class="panel" style="animation-delay:.2s">
+    <div class="panel-head">
+      <div class="ph-left">
+        <div class="p-icon b">🕐</div>
+        <div>
+          <div class="panel-title">Sessions récentes</div>
+          <div class="panel-sub" id="sess-sub">Toutes les activités</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-body" style="padding:0;">
+      <table class="sess-table">
+        <thead>
+          <tr>
+            <th>Utilisateur</th>
+            <th>Fichier</th>
+            <th>Date</th>
+            <th>Insérées</th>
+            <th>Rejetées</th>
+          </tr>
+        </thead>
+        <tbody id="sess-body">
+          <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">Chargement…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// Apply saved theme
+if (localStorage.getItem('theme') === 'light') {
+  document.documentElement.classList.add('light');
+  setTimeout(() => { const b = document.getElementById('theme-btn'); if(b) b.textContent='☀️'; }, 0);
+}
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.getElementById('theme-btn');
+  if (html.classList.contains('light')) {
+    html.classList.remove('light'); btn.textContent='🌙';
+    localStorage.setItem('theme','dark');
+  } else {
+    html.classList.add('light'); btn.textContent='☀️';
+    localStorage.setItem('theme','light');
+  }
+}
+
+// ── Load data ──────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const r = await fetch('/admin/stats');
+    const d = await r.json();
+    // Stats
+    countUp('s-pers', d.total_personnes || 0);
+    countUp('s-cum',  d.total_insere_cumule || 0);
+    countUp('s-ses',  d.nb_sessions || 0);
+    countUp('s-users', (d.users || []).length);
+    // Users
+    renderUsers(d.users || []);
+    // Sessions
+    renderSessions(d.sessions || []);
+    document.getElementById('sess-sub').textContent =
+      `${(d.sessions||[]).length} session(s) enregistrée(s)`;
+  } catch(e) { console.error(e); }
+}
+
+function renderUsers(users) {
+  const el = document.getElementById('users-grid');
+  document.getElementById('users-sub').textContent =
+    `${users.length} utilisateur(s)`;
+  if (!users.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-ico">👤</div>Aucun utilisateur créé</div>';
+    return;
+  }
+  el.innerHTML = users.map(u => `
+    <div class="user-card">
+      <div class="uc-top">
+        <div class="uc-name">👤 ${u.display}</div>
+        <button class="uc-del" onclick="deleteUser('${u.username}')" title="Supprimer">✕</button>
+      </div>
+      <div class="uc-stats">
+        <div>
+          <div class="uc-stat-val g">${u.total_inserted}</div>
+          <div class="uc-stat-lbl">Insérées</div>
+        </div>
+        <div>
+          <div class="uc-stat-val" style="color:var(--text)">${u.nb_sessions}</div>
+          <div class="uc-stat-lbl">Sessions</div>
+        </div>
+      </div>
+      <div class="uc-last">Dernière activité : ${u.last_session}</div>
+    </div>`).join('');
+}
+
+function renderSessions(sessions) {
+  const tbody = document.getElementById('sess-body');
+  if (!sessions.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">Aucune session</td></tr>';
+    return;
+  }
+  tbody.innerHTML = [...sessions].reverse().map(s => `
+    <tr>
+      <td><span class="u-badge">${s.user || '?'}</span></td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${s.file}">${s.file}</td>
+      <td style="color:var(--muted)">${s.date.slice(0,16)}</td>
+      <td><span class="ins-badge">+${s.inserted}</span></td>
+      <td style="color:var(--muted)">${s.rejected} rej.</td>
+    </tr>`).join('');
+}
+
+// ── countUp animation ──────────────────────────────────────────────────────
+function countUp(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const cur = parseInt(el.textContent.replace(/\D/g,'')) || 0;
+  if (cur === target) { el.textContent = target.toLocaleString('fr'); return; }
+  let start = null;
+  (function step(ts) {
+    if (!start) start = ts;
+    const p = Math.min((ts-start)/700, 1);
+    const e = 1-Math.pow(1-p,3);
+    el.textContent = Math.round(cur+(target-cur)*e).toLocaleString('fr');
+    if (p < 1) requestAnimationFrame(step);
+  })(performance.now());
+}
+
+// ── Create user ────────────────────────────────────────────────────────────
+let createdAccess = [];
+
+async function createUser() {
+  const u = document.getElementById('new-username').value.trim();
+  const p = document.getElementById('new-password').value.trim();
+  const msg = document.getElementById('create-msg');
+  if (!u || !p) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '⚠️ Remplissez les deux champs.';
+    return;
+  }
+  const r = await fetch('/admin/users', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: u, password: p})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    msg.style.color = 'var(--accent)';
+    msg.textContent = `✅ ${u} créé avec succès !`;
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-password').value = '';
+    // Add to created list
+    createdAccess.push({name: u, pwd: p});
+    renderCreated();
+    loadAll();
+  } else {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '❌ ' + d.error;
+  }
+}
+
+function renderCreated() {
+  const wrap = document.getElementById('created-list');
+  const items = document.getElementById('created-items');
+  wrap.style.display = 'block';
+  items.innerHTML = createdAccess.map(a => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">
+      <span style="font-size:13px;font-weight:600;color:var(--text)">👤 ${a.name}</span>
+      <span style="font-size:12px;color:var(--muted)">Mot de passe : <span style="color:var(--accent);font-weight:600;font-family:monospace">${a.pwd}</span></span>
+    </div>`).join('');
+}
+
+// ── Delete user ────────────────────────────────────────────────────────────
+async function deleteUser(username) {
+  if (!confirm(`Supprimer l'utilisateur "${username}" ?\nSes données resteront dans le fichier mère.`)) return;
+  const r = await fetch('/admin/users/' + encodeURIComponent(username), {method: 'DELETE'});
+  const d = await r.json();
+  if (d.ok) { loadAll(); }
+  else alert('Erreur : ' + d.error);
+}
+
+// ── Password visibility ────────────────────────────────────────────────────
+function togglePw() {
+  const inp = document.getElementById('new-password');
+  const eye = document.getElementById('pw-eye');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  eye.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>
