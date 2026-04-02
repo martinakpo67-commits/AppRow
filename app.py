@@ -747,8 +747,12 @@ def stats():
         "is_admin":            is_admin(),
     })
 
-@app.route("/admin/stats")
+@app.route("/admin-panel")
 @require_admin
+def admin_panel_page():
+    return render_template("admin.html")
+
+
 def admin_stats():
     """Stats complètes par utilisateur pour l'admin."""
     log = load_log()
@@ -843,4 +847,3 @@ else:
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
-
