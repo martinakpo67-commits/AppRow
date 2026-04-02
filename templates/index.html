@@ -3,590 +3,592 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Villages & Quartiers Bénin — Système d'intégration</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<title>Villages & Quartiers Bénin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --navy:   #1F3864;
-    --blue:   #2E75B6;
-    --sky:    #9DC3E6;
-    --yellow: #FFF2CC;
-    --green:  #1DB954;
-    --red:    #E74C3C;
-    --white:  #FFFFFF;
-    --bg:     #F0F4FA;
-    --card:   #FFFFFF;
-    --text:   #1a2540;
-    --muted:  #6b7a99;
-    --border: #dce4f0;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
+:root {
+  --bg:#080c10; --surface:#0f1419; --surface2:#161d26;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+  --text:#e8edf3; --muted:#6b7d8f;
+  --accent:#00d68f; --accent2:#0099ff;
+  --warn:#ff6b35; --danger:#ff4757; --yellow:#ffd166;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
 
-  /* ── HEADER ── */
-  header {
-    background: var(--navy);
-    padding: 0 40px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 68px;
-    box-shadow: 0 2px 20px rgba(31,56,100,0.25);
-  }
-  .logo {
-    display: flex; align-items: center; gap: 14px;
-  }
-  .logo-flag {
-    width: 54px; height: 36px; border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    flex-shrink: 0;
-    object-fit: cover;
-  }
-    .logo h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 17px; font-weight: 800;
-    color: #fff; letter-spacing: 0.3px;
-    line-height: 1.2;
-  }
-  .logo h1 span { color: var(--sky); font-weight: 400; font-size: 13px; display: block; }
-  .header-actions { display: flex; gap: 10px; align-items: center; }
-  .btn-header {
-    padding: 8px 18px; border-radius: 8px; border: none;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-    cursor: pointer; transition: all .18s;
-  }
-  .btn-download {
-    background: var(--green); color: #fff;
-  }
-  .btn-download:hover { background: #17a349; transform: translateY(-1px); }
-  .btn-reset {
-    background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2);
-  }
-  .btn-reset:hover { background: rgba(255,255,255,0.2); }
+/* ambient glow */
+.amb{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(120px);opacity:.3;}
+.a1{width:600px;height:600px;top:-200px;left:-100px;background:radial-gradient(circle,rgba(0,135,81,.5),transparent 70%);}
+.a2{width:500px;height:500px;top:50%;right:-150px;background:radial-gradient(circle,rgba(0,153,255,.3),transparent 70%);}
+.a3{width:400px;height:400px;bottom:-100px;left:30%;background:radial-gradient(circle,rgba(232,17,45,.25),transparent 70%);}
 
-  /* ── STATS BAR ── */
-  .stats-bar {
-    background: var(--blue);
-    padding: 14px 40px;
-    display: flex; gap: 36px; align-items: center;
-  }
-  .stat { text-align: center; }
-  .stat-val {
-    font-family: 'Syne', sans-serif;
-    font-size: 22px; font-weight: 700; color: #fff;
-  }
-  .stat-lbl { font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px; }
-  .stat-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.2); }
+/* header */
+header{position:relative;z-index:10;padding:0 48px;height:72px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(8,12,16,.88);backdrop-filter:blur(20px);}
+.logo{display:flex;align-items:center;gap:16px;}
+.flag-wrap{width:42px;height:28px;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 4px 16px rgba(0,0,0,.4);flex-shrink:0;}
+.flag-wrap img{width:100%;height:100%;object-fit:cover;}
+.logo-text h1{font-family:'Cabinet Grotesk',sans-serif;font-size:15px;font-weight:800;color:#fff;letter-spacing:-.2px;line-height:1.2;}
+.logo-text span{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.5px;text-transform:uppercase;}
+.pill{background:rgba(0,214,143,.1);border:1px solid rgba(0,214,143,.2);color:var(--accent);font-size:10px;font-weight:600;letter-spacing:.8px;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+.h-btns{display:flex;gap:8px;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:8px;border:none;font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted);}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);}
 
-  /* ── MAIN LAYOUT ── */
-  main { padding: 32px 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1300px; margin: 0 auto; }
+/* stats ribbon */
+.stats-ribbon{position:relative;z-index:9;display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);background:rgba(15,20,25,.6);backdrop-filter:blur(10px);}
+.stat-cell{padding:18px 24px;display:flex;flex-direction:column;gap:4px;border-right:1px solid var(--border);}
+.stat-cell:last-child{border-right:none;}
+.stat-lbl{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.stat-val{font-family:'Cabinet Grotesk',sans-serif;font-size:28px;font-weight:900;line-height:1;background:linear-gradient(135deg,#fff 40%,var(--muted));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.stat-val.green{background:linear-gradient(135deg,var(--accent),#00a86b);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
 
-  /* ── CARDS ── */
-  .card {
-    background: var(--card); border-radius: 16px;
-    border: 1px solid var(--border);
-    box-shadow: 0 2px 12px rgba(31,56,100,0.06);
-    overflow: hidden;
-  }
-  .card-header {
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 10px;
-  }
-  .card-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
-  }
-  .card-icon.blue  { background: #EBF3FC; }
-  .card-icon.navy  { background: #E8EDF5; }
-  .card-icon.green { background: #E6FAF0; }
-  .card-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; }
-  .card-sub   { font-size: 12px; color: var(--muted); }
-  .card-body  { padding: 24px; }
+/* main */
+main{position:relative;z-index:5;display:grid;grid-template-columns:1fr 1fr;gap:0;max-width:1400px;margin:0 auto;padding:40px 48px;}
 
-  /* ── DROP ZONE ── */
-  #drop-zone {
-    border: 2px dashed var(--sky);
-    border-radius: 12px;
-    padding: 40px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .2s;
-    background: #F7FAFF;
-    position: relative;
-  }
-  #drop-zone.drag-over {
-    border-color: var(--blue);
-    background: #EBF3FC;
-    transform: scale(1.01);
-  }
-  #drop-zone input[type=file] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-  }
-  .drop-icon { font-size: 42px; margin-bottom: 12px; }
-  .drop-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 6px; color: var(--navy); }
-  .drop-sub { font-size: 13px; color: var(--muted); }
-  .drop-formats { display: inline-block; margin-top: 10px; padding: 4px 12px; background: var(--sky); color: var(--navy); border-radius: 20px; font-size: 11px; font-weight: 600; }
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;animation:fadeUp .5s ease both;}
+.panel-l{margin-right:16px;animation-delay:.05s;}
+.panel-r{margin-left:16px;animation-delay:.1s;}
+.panel-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.p-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.p-icon.g{background:rgba(0,214,143,.12);}
+.p-icon.b{background:rgba(0,153,255,.12);}
+.panel-title{font-family:'Cabinet Grotesk',sans-serif;font-size:15px;font-weight:700;color:#fff;}
+.panel-sub{font-size:12px;color:var(--muted);margin-top:2px;}
 
-  /* File queue */
-  #file-queue { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
-  .file-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; background: #F7FAFF;
-    border: 1px solid var(--border); border-radius: 10px;
-    font-size: 13px;
-  }
-  .file-item .fi-icon { font-size: 20px; }
-  .file-item .fi-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .file-item .fi-size { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  .file-item .fi-remove { cursor: pointer; color: var(--muted); padding: 2px 6px; border-radius: 4px; }
-  .file-item .fi-remove:hover { background: #fee; color: var(--red); }
-  .file-item.processing { border-color: var(--blue); background: #EBF3FC; }
-  .file-item.done       { border-color: var(--green); background: #E6FAF0; }
-  .file-item.error      { border-color: var(--red);   background: #FEF0F0; }
+/* drop zone */
+.drop-zone{margin:20px 24px;border:1.5px dashed var(--border2);border-radius:12px;padding:40px 24px;text-align:center;cursor:pointer;transition:all .25s;background:rgba(255,255,255,.02);position:relative;overflow:hidden;}
+.drop-zone::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(0,214,143,.12),transparent 70%);opacity:0;transition:opacity .3s;}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:rgba(0,214,143,.04);}
+.drop-zone:hover::before,.drop-zone.drag-over::before{opacity:1;}
+.dz-icon{width:56px;height:56px;border-radius:14px;background:rgba(0,214,143,.1);border:1px solid rgba(0,214,143,.2);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;}
+.dz-title{font-family:'Cabinet Grotesk',sans-serif;font-size:15px;font-weight:700;color:#fff;margin-bottom:6px;}
+.dz-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.dz-badge{display:inline-block;background:rgba(255,255,255,.06);border:1px solid var(--border2);color:var(--muted);font-size:11px;font-weight:500;padding:3px 10px;border-radius:6px;}
+input[type=file]{display:none;}
 
-  /* Process button */
-  #btn-process {
-    width: 100%; margin-top: 18px;
-    padding: 14px; border-radius: 12px; border: none;
-    background: var(--navy); color: #fff;
-    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
-    cursor: pointer; transition: all .2s;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-  }
-  #btn-process:hover:not(:disabled) { background: var(--blue); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(31,56,100,0.3); }
-  #btn-process:disabled { opacity: .5; cursor: not-allowed; }
-  .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* file queue */
+.file-queue{padding:0 24px 8px;display:flex;flex-direction:column;gap:6px;}
+.file-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);transition:all .2s;}
+.file-item.processing{border-color:rgba(0,153,255,.3);background:rgba(0,153,255,.06);}
+.file-item.done{border-color:rgba(0,214,143,.3);background:rgba(0,214,143,.05);}
+.file-item.error{border-color:rgba(255,71,87,.3);background:rgba(255,71,87,.05);}
+.fi-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s;}
+.file-item.processing .fi-dot{background:var(--accent2);animation:pulse 1s infinite;}
+.file-item.done .fi-dot{background:var(--accent);}
+.file-item.error .fi-dot{background:var(--danger);}
+.fi-name{flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fi-size{font-size:11px;color:var(--muted);flex-shrink:0;}
+.fi-rm{width:22px;height:22px;border-radius:6px;background:rgba(255,71,87,.1);border:none;cursor:pointer;color:var(--danger);font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.fi-rm:hover{background:rgba(255,71,87,.25);}
 
-  /* ── RESULTS PANEL ── */
-  #results-panel { grid-column: 1 / -1; display: none; }
-  .result-card {
-    border: 1px solid var(--border); border-radius: 12px;
-    margin-bottom: 14px; overflow: hidden;
-  }
-  .result-header {
-    padding: 14px 20px; display: flex; align-items: center; gap: 12px;
-    background: var(--navy); color: #fff;
-  }
-  .result-header.success { background: #0f5132; }
-  .result-header.error   { background: #842029; }
-  .result-fname { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; flex: 1; }
-  .result-badge {
-    padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
-    background: rgba(255,255,255,0.2); white-space: nowrap;
-  }
-  .result-body { padding: 20px; }
-  .metrics { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-  .metric {
-    flex: 1; min-width: 110px; padding: 14px 16px;
-    border-radius: 10px; text-align: center;
-  }
-  .metric.ins  { background: #E6FAF0; }
-  .metric.rej  { background: #FEF0F0; }
-  .metric.dup  { background: #FFF8E1; }
-  .metric.new  { background: #FFF2CC; }
-  .metric.ov   { background: #EBF3FC; }
-  .metric-val  { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; }
-  .metric.ins .metric-val { color: #1DB954; }
-  .metric.rej .metric-val { color: var(--red); }
-  .metric.dup .metric-val { color: #E67E22; }
-  .metric.new .metric-val { color: #8B6914; }
-  .metric.ov  .metric-val { color: var(--blue); }
-  .metric-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+/* process btn */
+.proc-wrap{padding:16px 24px 24px;}
+.btn-process{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),#00a876);border:none;border-radius:12px;font-family:'Cabinet Grotesk',sans-serif;font-size:14px;font-weight:800;letter-spacing:.3px;color:#000;cursor:pointer;transition:all .25s;box-shadow:0 4px 24px rgba(0,214,143,.25),inset 0 1px 0 rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;gap:8px;position:relative;overflow:hidden;}
+.btn-process::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);transform:translateX(-100%);transition:transform .5s;}
+.btn-process:hover:not(:disabled)::after{transform:translateX(100%);}
+.btn-process:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,214,143,.4);}
+.btn-process:disabled{opacity:.4;cursor:not-allowed;transform:none;}
 
-  /* Rejets table */
-  .rejets-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--muted); }
-  .rejets-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .rejets-table th { background: #F0F4FA; padding: 8px 10px; text-align: left; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
-  .rejets-table td { padding: 7px 10px; border-top: 1px solid var(--border); }
-  .rejets-table tr:hover td { background: #F7FAFF; }
-  .tag { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-  .tag.manq { background: #FEE2E2; color: #9B1C1C; }
-  .tag.dupl { background: #FEF3C7; color: #92400E; }
+/* history */
+.hist-list{padding:0 24px 24px;display:flex;flex-direction:column;gap:6px;}
+.hist-item{display:grid;grid-template-columns:auto 1fr auto auto auto;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);transition:border-color .2s;}
+.hist-item:hover{border-color:var(--border2);}
+.h-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 6px var(--accent);}
+.h-file{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.h-date{font-size:10px;color:var(--muted);flex-shrink:0;}
+.h-ins{font-size:12px;color:var(--accent);font-weight:600;flex-shrink:0;}
+.h-rej{font-size:11px;color:var(--muted);flex-shrink:0;}
+.empty{text-align:center;padding:40px 24px;color:var(--muted);font-size:13px;}
+.empty-ico{font-size:32px;margin-bottom:10px;opacity:.4;}
 
-  /* ── HISTORY ── */
-  .history-list { display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto; }
-  .history-item {
-    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
-    border: 1px solid var(--border); border-radius: 8px; font-size: 12px;
-  }
-  .hi-date { color: var(--muted); white-space: nowrap; }
-  .hi-file { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .hi-ins  { color: var(--green); font-weight: 700; white-space: nowrap; }
-  .hi-rej  { color: var(--red);   white-space: nowrap; }
-  .no-history { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; }
+/* results */
+#results-panel{display:none;margin-top:32px;grid-column:1/-1;}
+.res-head{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.res-title{font-family:'Cabinet Grotesk',sans-serif;font-size:18px;font-weight:800;color:#fff;}
+.res-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.result-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;}
+.result-card:hover{border-color:var(--border2);}
+.result-hd{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.result-hd.suc{background:rgba(0,214,143,.05);}
+.result-hd.err{background:rgba(255,71,87,.05);}
+.r-fname{font-size:13px;font-weight:500;color:#fff;}
+.r-badge{font-size:12px;font-weight:600;padding:3px 10px;border-radius:6px;}
+.result-hd.suc .r-badge{background:rgba(0,214,143,.15);color:var(--accent);}
+.result-hd.err .r-badge{background:rgba(255,71,87,.15);color:var(--danger);}
+.result-bd{padding:18px 20px;}
+.metrics{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.metric{flex:1;min-width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;}
+.m-val{font-family:'Cabinet Grotesk',sans-serif;font-size:24px;font-weight:900;line-height:1;}
+.m-lbl{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;}
+.metric.ins .m-val{color:var(--accent);}
+.metric.ov  .m-val{color:var(--accent2);}
+.metric.nw  .m-val{color:var(--yellow);}
+.metric.dup .m-val{color:var(--warn);}
+.metric.rej .m-val{color:var(--danger);}
+.rej-title{font-size:12px;font-weight:600;color:var(--warn);margin-bottom:10px;padding:8px 12px;background:rgba(255,107,53,.06);border-radius:8px;border:1px solid rgba(255,107,53,.15);}
+.rej-table{width:100%;border-collapse:collapse;font-size:12px;}
+.rej-table th{text-align:left;padding:8px 12px;background:var(--surface2);color:var(--muted);font-weight:600;font-size:10px;letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+.rej-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
+.rej-table tr:last-child td{border-bottom:none;}
+.rej-table tr:hover td{background:rgba(255,255,255,.02);}
+.tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;}
+.tag.manq{background:rgba(255,71,87,.12);color:var(--danger);}
+.tag.dupl{background:rgba(255,209,102,.12);color:var(--yellow);}
 
-  /* ── TOAST ── */
-  #toast {
-    position: fixed; bottom: 28px; right: 28px; z-index: 999;
-    padding: 12px 22px; border-radius: 10px;
-    font-size: 14px; font-weight: 500; color: #fff;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    transform: translateY(80px); opacity: 0;
-    transition: all .3s; pointer-events: none;
-  }
-  #toast.show { transform: translateY(0); opacity: 1; }
-  #toast.success { background: var(--green); }
-  #toast.error   { background: var(--red); }
-  #toast.info    { background: var(--navy); }
+/* spinner */
+.spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(0,0,0,.3);border-top-color:#000;animation:spin .6s linear infinite;display:inline-block;}
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--sky); border-radius: 3px; }
+/* toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);padding:12px 22px;border-radius:12px;font-size:13px;font-weight:500;opacity:0;transition:all .3s;z-index:999;backdrop-filter:blur(20px);max-width:90vw;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.4);}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.success{background:rgba(0,214,143,.15);border:1px solid rgba(0,214,143,.3);color:var(--accent);}
+#toast.error{background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--danger);}
+#toast.info{background:rgba(0,153,255,.15);border:1px solid rgba(0,153,255,.3);color:var(--accent2);}
 
-  @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; padding: 20px; }
-    #results-panel { grid-column: 1; }
-    .stats-bar { gap: 18px; padding: 12px 20px; flex-wrap: wrap; }
-    header { padding: 0 20px; }
-  }
+/* scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:900px){
+  main{grid-template-columns:1fr;padding:20px 16px;}
+  .panel-l,.panel-r{margin:0 0 16px 0;}
+  header{padding:0 16px;}
+  .stats-ribbon{grid-template-columns:repeat(2,1fr);}
+  #results-panel{grid-column:1;}
+}
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
+<div class="amb a1"></div>
+<div class="amb a2"></div>
+<div class="amb a3"></div>
+
 <header>
   <div class="logo">
-    <img class="logo-flag" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Flag_of_Benin.svg/900px-Flag_of_Benin.svg.png" alt="Drapeau Bénin">
-    <h1>Villages & Quartiers Bénin <span>Système de centralisation de données</span></h1>
+    <div class="flag-wrap">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Flag_of_Benin.svg/900px-Flag_of_Benin.svg.png" alt="Bénin">
+    </div>
+    <div class="logo-text">
+      <h1>Villages &amp; Quartiers Bénin</h1>
+      <span>Système de centralisation</span>
+    </div>
+    <span class="pill">v4</span>
   </div>
-  <div class="header-actions">
-    <button class="btn-header btn-download" onclick="downloadMere()">⬇ Télécharger le fichier mère</button>
-    <button class="btn-header btn-reset" onclick="resetData()">↺ Réinitialiser</button>
+  <div class="h-btns" style="align-items:center;">
+    <span style="font-size:12px;color:var(--muted);margin-right:4px;">👤 <span id="h-user"></span></span>
+    <span id="admin-btns" style="display:none">
+      <button class="btn btn-ghost" onclick="downloadMere()">⬇ Télécharger</button>
+      <button class="btn btn-ghost" onclick="resetData()">↺ Réinitialiser</button>
+    </span>
+    <button class="btn btn-ghost" onclick="window.location='/logout'">Déconnexion</button>
   </div>
 </header>
 
-<!-- STATS BAR -->
-<div class="stats-bar" id="stats-bar">
-  <div class="stat">
-    <div class="stat-val" id="st-personnes">—</div>
+<div class="stats-ribbon">
+  <div class="stat-cell">
     <div class="stat-lbl">Personnes enregistrées</div>
+    <div class="stat-val green" id="s-pers">—</div>
   </div>
-  <div class="stat-divider"></div>
-  <div class="stat">
-    <div class="stat-val" id="st-insere">—</div>
+  <div class="stat-cell">
     <div class="stat-lbl">Total inséré (cumulé)</div>
+    <div class="stat-val" id="s-cum">—</div>
   </div>
-  <div class="stat-divider"></div>
-  <div class="stat">
-    <div class="stat-val" id="st-sessions">—</div>
-    <div class="stat-lbl">Sessions de traitement</div>
+  <div class="stat-cell">
+    <div class="stat-lbl" data-lbl="ses">Sessions de traitement</div>
+    <div class="stat-val" id="s-ses">—</div>
   </div>
-  <div class="stat-divider"></div>
-  <div class="stat">
-    <div class="stat-val" id="st-lignes">—</div>
+  <div class="stat-cell">
     <div class="stat-lbl">Lignes fichier mère</div>
+    <div class="stat-val" id="s-lig">—</div>
   </div>
 </div>
 
 <main>
 
-  <!-- UPLOAD CARD -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon blue">📂</div>
+  <div class="panel panel-l">
+    <div class="panel-head">
+      <div class="p-icon g">📂</div>
       <div>
-        <div class="card-title">Importer des fichiers</div>
-        <div class="card-sub">Glissez-déposez un ou plusieurs fichiers Excel</div>
+        <div class="panel-title">Importer des fichiers</div>
+        <div class="panel-sub">Glissez-déposez un ou plusieurs fichiers Excel</div>
       </div>
     </div>
-    <div class="card-body">
-      <div id="drop-zone">
-        <input type="file" id="file-input" multiple accept=".xlsx,.xls">
-        <div class="drop-icon">📊</div>
-        <div class="drop-title">Glissez vos fichiers ici</div>
-        <div class="drop-sub">ou cliquez pour sélectionner</div>
-        <span class="drop-formats">.xlsx · .xls</span>
-      </div>
-      <div id="file-queue"></div>
-      <button id="btn-process" disabled onclick="processFiles()">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="dz-icon">📊</div>
+      <div class="dz-title">Glissez vos fichiers ici</div>
+      <div class="dz-sub">ou cliquez pour sélectionner</div>
+      <span class="dz-badge">.xlsx · .xls</span>
+      <input type="file" id="file-input" accept=".xlsx,.xls" multiple>
+    </div>
+    <div class="file-queue" id="file-queue"></div>
+    <div class="proc-wrap">
+      <button class="btn-process" id="btn-process" disabled onclick="processFiles()">
         <span id="btn-text">▶ Lancer le traitement</span>
       </button>
     </div>
   </div>
 
-  <!-- HISTORY CARD -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon navy">🕐</div>
+  <div class="panel panel-r">
+    <div class="panel-head">
+      <div class="p-icon b">🕐</div>
       <div>
-        <div class="card-title">Historique des traitements</div>
-        <div class="card-sub">10 dernières sessions</div>
+        <div class="panel-title">Historique des traitements</div>
+        <div class="panel-sub">10 dernières sessions</div>
       </div>
     </div>
-    <div class="card-body">
-      <div class="history-list" id="history-list">
-        <div class="no-history">Aucun traitement effectué</div>
-      </div>
+    <div id="hist-list" class="hist-list">
+      <div class="empty"><div class="empty-ico">📭</div>Aucun traitement effectué</div>
     </div>
   </div>
 
-  <!-- RESULTS PANEL (full width) -->
-  <div class="card" id="results-panel">
-    <div class="card-header">
-      <div class="card-icon green">✅</div>
+  <div id="results-panel">
+    <div class="res-head">
       <div>
-        <div class="card-title">Résultats du traitement</div>
-        <div class="card-sub" id="results-sub">—</div>
+        <div class="res-title">✅ Résultats du traitement</div>
+        <div class="res-sub" id="results-sub"></div>
       </div>
     </div>
-    <div class="card-body" id="results-body"></div>
+    <div id="results-body"></div>
   </div>
+
+
+  <!-- ADMIN PANEL -->
+  <div id="admin-panel" style="display:none;margin-top:32px;grid-column:1/-1;">
+    <div class="res-head">
+      <div>
+        <div class="res-title">👑 Tableau de bord administrateur</div>
+        <div class="res-sub" id="admin-sub">Statistiques par utilisateur</div>
+      </div>
+      <button class="btn btn-ghost" onclick="loadAdminStats()" style="margin-left:auto;">↻ Actualiser</button>
+    </div>
+
+    <!-- User cards -->
+    <div id="admin-users" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:24px;"></div>
+
+    <!-- Recent global sessions -->
+    <div class="panel" style="padding:20px 24px;">
+      <div style="font-family:Cabinet Grotesk,sans-serif;font-size:14px;font-weight:700;color:#fff;margin-bottom:14px;">Sessions récentes (toutes)</div>
+      <div id="admin-sessions"></div>
+    </div>
+
+    <!-- Create user form -->
+    <div class="panel" style="padding:24px;margin-top:16px;">
+      <div style="font-family:Cabinet Grotesk,sans-serif;font-size:14px;font-weight:700;color:#fff;margin-bottom:16px;">➕ Créer un utilisateur</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;">
+        <div>
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Prénom</div>
+          <input type="text" id="new-username" placeholder="Ex: Jean" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:Instrument Sans,sans-serif;">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Mot de passe</div>
+          <input type="text" id="new-password" placeholder="Mot de passe" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:Instrument Sans,sans-serif;">
+        </div>
+        <button onclick="createUser()" style="padding:10px 20px;background:var(--accent);border:none;border-radius:8px;color:#000;font-weight:700;cursor:pointer;font-size:13px;transition:all .2s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">Créer</button>
+      </div>
+      <div id="create-msg" style="font-size:12px;margin-top:10px;"></div>
+    </div>
+  </div>
+
 
 </main>
 
 <div id="toast"></div>
 
 <script>
-  let selectedFiles = [];
+let selectedFiles = [];
 
-  // ── Load stats on page load ──────────────────────────────────────────────
-  async function loadStats() {
-    try {
-      const r = await fetch('/stats');
-      const d = await r.json();
-      document.getElementById('st-personnes').textContent = d.total_personnes.toLocaleString('fr');
-      document.getElementById('st-insere').textContent    = d.total_insere_cumule.toLocaleString('fr');
-      document.getElementById('st-sessions').textContent  = d.nb_sessions;
-      document.getElementById('st-lignes').textContent    = d.total_lignes_mere.toLocaleString('fr');
-      renderHistory(d.sessions);
-    } catch(e) {}
-  }
-  loadStats();
-
-  function renderHistory(sessions) {
-    const el = document.getElementById('history-list');
-    if (!sessions || !sessions.length) {
-      el.innerHTML = '<div class="no-history">Aucun traitement effectué</div>';
-      return;
-    }
-    el.innerHTML = [...sessions].reverse().map(s => `
-      <div class="history-item">
-        <span class="hi-date">${s.date.slice(0,16)}</span>
-        <span class="hi-file" title="${s.file}">${s.file}</span>
-        <span class="hi-ins">+${s.inserted} insérés</span>
-        <span class="hi-rej">${s.rejected} rejetés</span>
-      </div>`).join('');
-  }
-
-  // ── File drop/select ─────────────────────────────────────────────────────
-  const dropZone  = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault(); dropZone.classList.remove('drag-over');
-    addFiles([...e.dataTransfer.files]);
-  });
-  fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value=''; });
-
-  function addFiles(files) {
-    files.forEach(f => {
-      if (!f.name.match(/\.(xlsx|xls)$/i)) { showToast('⚠️ ' + f.name + ' ignoré (format invalide)', 'error'); return; }
-      if (selectedFiles.find(x => x.name === f.name && x.size === f.size)) return;
-      selectedFiles.push(f);
-    });
-    renderQueue();
-  }
-
-  function removeFile(idx) {
-    selectedFiles.splice(idx, 1);
-    renderQueue();
-  }
-
-  function formatSize(b) {
-    if (b < 1024) return b + ' o';
-    if (b < 1024*1024) return (b/1024).toFixed(0) + ' Ko';
-    return (b/1024/1024).toFixed(1) + ' Mo';
-  }
-
-  function renderQueue() {
-    const q = document.getElementById('file-queue');
-    if (!selectedFiles.length) { q.innerHTML = ''; document.getElementById('btn-process').disabled = true; return; }
-    q.innerHTML = selectedFiles.map((f, i) => `
-      <div class="file-item" id="fi-${i}">
-        <span class="fi-icon">📄</span>
-        <span class="fi-name" title="${f.name}">${f.name}</span>
-        <span class="fi-size">${formatSize(f.size)}</span>
-        <span class="fi-remove" onclick="removeFile(${i})">✕</span>
-      </div>`).join('');
-    document.getElementById('btn-process').disabled = false;
-  }
-
-  // ── Process files ONE BY ONE (avoid timeout) ────────────────────────────
-  async function processFiles() {
-    if (!selectedFiles.length) return;
-    const btn  = document.getElementById('btn-process');
-    const btxt = document.getElementById('btn-text');
-    btn.disabled = true;
-
-    const allResults = [];
-    const total = selectedFiles.length;
-
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const f = selectedFiles[i];
-      btxt.innerHTML = `<div class="spinner"></div> Fichier ${i+1}/${total} : ${f.name.substring(0,30)}…`;
-
-      // Mark as processing
-      const el = document.getElementById('fi-' + i);
-      if (el) el.classList.add('processing');
-
-      const form = new FormData();
-      form.append('files', f);
-
-      try {
-        const resp = await fetch('/upload', { method: 'POST', body: form });
-
-        // Check if response is HTML (server error)
-        const contentType = resp.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-          const text = await resp.text();
-          console.error('Server returned HTML:', text.substring(0, 200));
-          allResults.push({ filename: f.name, error: 'Erreur serveur (timeout ou crash)' });
-          if (el) { el.classList.remove('processing'); el.classList.add('error'); }
-          continue;
-        }
-
-        const data = await resp.json();
-        const results = Array.isArray(data.results) ? data.results : [];
-        const r = results[0] || { filename: f.name, error: 'Réponse vide' };
-        allResults.push(r);
-
-        if (el) {
-          el.classList.remove('processing');
-          el.classList.add(r.error ? 'error' : 'done');
-        }
-
-      } catch(e) {
-        allResults.push({ filename: f.name, error: e.message });
-        if (el) { el.classList.remove('processing'); el.classList.add('error'); }
-      }
-
-      // Small pause between files
-      if (i < selectedFiles.length - 1) {
-        await new Promise(res => setTimeout(res, 500));
-      }
-    }
-
-    // Show all results
-    if (allResults.length > 0) renderResults(allResults);
-    loadStats();
-    selectedFiles = [];
-    setTimeout(() => { renderQueue(); }, 1500);
-    const totalIns = allResults.reduce((s, r) => s + (r.inserted || 0), 0);
-    showToast(`✅ ${totalIns} personne(s) insérée(s) sur ${total} fichier(s)`, 'success');
-
-    btn.disabled = false;
-    btxt.textContent = '▶ Lancer le traitement';
-  }
-
-  // ── Render results ───────────────────────────────────────────────────────
-  function renderResults(results) {
-    if (!results || !Array.isArray(results) || results.length === 0) return;
-    const panel = document.getElementById('results-panel');
-    const body  = document.getElementById('results-body');
-    const sub   = document.getElementById('results-sub');
-    panel.style.display = 'block';
-
-    const totalIns = results.reduce((s, r) => s + (r.inserted || 0), 0);
-    const totalRej = results.reduce((s, r) => s + (r.rejected_count || 0), 0);
-    sub.textContent = `${results.length} fichier(s) traité(s) — ${totalIns} insérés · ${totalRej} rejetés`;
-
-    body.innerHTML = results.map(r => {
-      if (r.error) return `
-        <div class="result-card">
-          <div class="result-header error">
-            <span class="result-fname">${r.filename}</span>
-            <span class="result-badge">❌ Erreur</span>
-          </div>
-          <div class="result-body"><p style="color:var(--red)">${r.error}</p></div>
-        </div>`;
-
-      const rejList = Array.isArray(r.rejected) ? r.rejected : [];
-      const rejetsHtml = rejList.length > 0 ? `
-        <div class="rejets-title">⚠️ Détail des rejets (${r.rejected_count || rejList.length} total, max 50 affichés)</div>
-        <table class="rejets-table">
-          <thead><tr><th>Ligne</th><th>Quartier</th><th>Nom</th><th>Raison</th></tr></thead>
-          <tbody>${rejList.map(x => `
-            <tr>
-              <td>${x.row || '—'}</td>
-              <td>${(x.quartier || '—').replace(/</g,'&lt;')}</td>
-              <td>${(x.nom || '—').replace(/</g,'&lt;')}</td>
-              <td><span class="tag ${(x.reason||'').includes('Doublon') ? 'dupl' : 'manq'}">${x.reason || '—'}</span></td>
-            </tr>`).join('')}
-          </tbody>
-        </table>` : '';
-
-      return `
-        <div class="result-card">
-          <div class="result-header success">
-            <span class="result-fname">📄 ${r.filename}</span>
-            <span class="result-badge">✅ ${r.inserted} insérés</span>
-          </div>
-          <div class="result-body">
-            <div class="metrics">
-              <div class="metric ins">
-                <div class="metric-val">${r.inserted}</div>
-                <div class="metric-lbl">Insérées</div>
-              </div>
-              <div class="metric ov">
-                <div class="metric-val">${r.overflow || 0}</div>
-                <div class="metric-lbl">Débordement</div>
-              </div>
-              <div class="metric new">
-                <div class="metric-val">${r.new_quartiers || 0}</div>
-                <div class="metric-lbl">Nvx quartiers</div>
-              </div>
-              <div class="metric dup">
-                <div class="metric-val">${r.duplicates || 0}</div>
-                <div class="metric-lbl">Doublons</div>
-              </div>
-              <div class="metric rej">
-                <div class="metric-val">${r.rejected_count || 0}</div>
-                <div class="metric-lbl">Rejetées</div>
-              </div>
-            </div>
-            ${rejetsHtml}
-          </div>
-        </div>`;
-    }).join('');
-
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  // ── Download / Reset ─────────────────────────────────────────────────────
-  function downloadMere() {
-    window.location.href = '/download';
-    showToast('⬇ Téléchargement en cours…', 'info');
-  }
-
-  async function resetData() {
-    if (!confirm('⚠️ Réinitialiser toutes les données insérées ?\nLa structure du fichier mère sera conservée.')) return;
-    const r = await fetch('/reset', { method: 'POST' });
+async function loadStats() {
+  try {
+    const r = await fetch('/stats');
     const d = await r.json();
-    loadStats();
-    document.getElementById('results-panel').style.display = 'none';
-    showToast('✅ ' + d.message, 'success');
+    countUp('s-pers', d.total_personnes || 0);
+    countUp('s-cum',  d.total_insere_cumule || 0);
+    countUp('s-lig',  d.total_lignes_mere || 0);
+    // Show user-specific stats or global
+    if (IS_ADMIN) {
+      countUp('s-ses', d.nb_sessions || 0);
+      renderHistory(d.sessions || []);
+    } else {
+      countUp('s-ses', d.user_nb_sessions || 0);
+      renderHistory(d.user_sessions || []);
+    }
+  } catch(e) {}
+}
+
+function countUp(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const cur = parseInt(el.textContent.replace(/\D/g,'')) || 0;
+  if (cur === target) { el.textContent = target.toLocaleString('fr'); return; }
+  let start = null;
+  (function step(ts) {
+    if (!start) start = ts;
+    const p = Math.min((ts-start)/700, 1);
+    const e = 1-Math.pow(1-p,3);
+    el.textContent = Math.round(cur+(target-cur)*e).toLocaleString('fr');
+    if (p < 1) requestAnimationFrame(step);
+  })(performance.now());
+}
+
+function renderHistory(sessions) {
+  const el = document.getElementById('hist-list');
+  if (!sessions.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-ico">📭</div>Aucun traitement effectué</div>';
+    return;
+  }
+  el.innerHTML = [...sessions].reverse().map(s => `
+    <div class="hist-item">
+      <div class="h-dot"></div>
+      <span class="h-file" title="${s.file}">${s.file}</span>
+      <span class="h-date">${s.date.slice(0,16)}</span>
+      <span class="h-ins">+${s.inserted}</span>
+      <span class="h-rej">${s.rejected} rej.</span>
+    </div>`).join('');
+}
+
+loadStats();
+setInterval(loadStats, 30000);
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); addFiles([...e.dataTransfer.files]); });
+fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value=''; });
+
+function addFiles(files) {
+  files.forEach(f => {
+    if (!f.name.match(/\.(xlsx|xls)$/i)) { showToast('⚠️ ' + f.name + ' — format invalide', 'error'); return; }
+    if (selectedFiles.find(x => x.name===f.name && x.size===f.size)) return;
+    selectedFiles.push(f);
+  });
+  renderQueue();
+}
+
+function removeFile(idx) { selectedFiles.splice(idx,1); renderQueue(); }
+
+function fmtSize(b) {
+  if (b < 1024) return b + ' o';
+  if (b < 1048576) return (b/1024).toFixed(0) + ' Ko';
+  return (b/1048576).toFixed(1) + ' Mo';
+}
+
+function renderQueue() {
+  const q = document.getElementById('file-queue');
+  const btn = document.getElementById('btn-process');
+  if (!selectedFiles.length) { q.innerHTML=''; btn.disabled=true; return; }
+  q.innerHTML = selectedFiles.map((f,i) => `
+    <div class="file-item" id="fi-${i}">
+      <div class="fi-dot"></div>
+      <span class="fi-name" title="${f.name}">${f.name}</span>
+      <span class="fi-size">${fmtSize(f.size)}</span>
+      <button class="fi-rm" onclick="removeFile(${i})">✕</button>
+    </div>`).join('');
+  btn.disabled = false;
+}
+
+async function processFiles() {
+  if (!selectedFiles.length) return;
+  const btn = document.getElementById('btn-process');
+  const btxt = document.getElementById('btn-text');
+  btn.disabled = true;
+  const allResults = [];
+  const total = selectedFiles.length;
+
+  for (let i = 0; i < selectedFiles.length; i++) {
+    const f = selectedFiles[i];
+    btxt.innerHTML = `<div class="spinner"></div> Fichier ${i+1}/${total} : ${f.name.substring(0,28)}…`;
+    const el = document.getElementById('fi-'+i);
+    if (el) el.classList.add('processing');
+    const form = new FormData();
+    form.append('files', f);
+    try {
+      const resp = await fetch('/upload', { method:'POST', body:form });
+      const ct = resp.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        allResults.push({ filename:f.name, error:'Erreur serveur (timeout ou crash)' });
+        if (el) { el.classList.remove('processing'); el.classList.add('error'); }
+        continue;
+      }
+      const data = await resp.json();
+      const results = Array.isArray(data.results) ? data.results : [];
+      const r = results[0] || { filename:f.name, error:'Réponse vide' };
+      allResults.push(r);
+      if (el) { el.classList.remove('processing'); el.classList.add(r.error ? 'error' : 'done'); }
+    } catch(e) {
+      allResults.push({ filename:f.name, error:e.message });
+      if (el) { el.classList.remove('processing'); el.classList.add('error'); }
+    }
+    if (i < selectedFiles.length-1) await new Promise(res => setTimeout(res, 400));
   }
 
-  // ── Toast ────────────────────────────────────────────────────────────────
-  let toastTimer;
-  function showToast(msg, type='info') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className   = 'show ' + type;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.className = ''; }, 3500);
+  if (allResults.length) renderResults(allResults);
+  loadStats();
+  selectedFiles = [];
+  setTimeout(renderQueue, 1500);
+  const totalIns = allResults.reduce((s,r) => s+(r.inserted||0), 0);
+  showToast(`✅ ${totalIns} personne(s) insérée(s) sur ${total} fichier(s)`, 'success');
+  btn.disabled = false;
+  btxt.textContent = '▶ Lancer le traitement';
+}
+
+function renderResults(results) {
+  if (!results || !Array.isArray(results) || !results.length) return;
+  const panel = document.getElementById('results-panel');
+  const body  = document.getElementById('results-body');
+  const sub   = document.getElementById('results-sub');
+  panel.style.display = 'block';
+  const ti = results.reduce((s,r) => s+(r.inserted||0), 0);
+  const tr = results.reduce((s,r) => s+(r.rejected_count||0), 0);
+  sub.textContent = `${results.length} fichier(s) traité(s) — ${ti} insérés · ${tr} rejetés`;
+
+  body.innerHTML = results.map(r => {
+    if (r.error) return `
+      <div class="result-card">
+        <div class="result-hd err"><span class="r-fname">${r.filename}</span><span class="r-badge">❌ Erreur</span></div>
+        <div class="result-bd"><p style="color:var(--danger);font-size:13px">${r.error}</p></div>
+      </div>`;
+
+    const rejList = Array.isArray(r.rejected) ? r.rejected : [];
+    const rejHtml = rejList.length ? `
+      <div class="rej-title">⚠️ Détail des rejets (${r.rejected_count||rejList.length} total, max 50 affichés)</div>
+      <table class="rej-table">
+        <thead><tr><th>Ligne</th><th>Quartier</th><th>Nom</th><th>Raison</th></tr></thead>
+        <tbody>${rejList.map(x => `
+          <tr>
+            <td>${x.row||'—'}</td>
+            <td>${(x.quartier||'—').replace(/</g,'&lt;')}</td>
+            <td>${(x.nom||'—').replace(/</g,'&lt;')}</td>
+            <td><span class="tag ${(x.reason||'').includes('Doublon')?'dupl':'manq'}">${x.reason||'—'}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '';
+
+    return `
+      <div class="result-card">
+        <div class="result-hd suc"><span class="r-fname">📄 ${r.filename}</span><span class="r-badge">✅ ${r.inserted} insérés</span></div>
+        <div class="result-bd">
+          <div class="metrics">
+            <div class="metric ins"><div class="m-val">${r.inserted}</div><div class="m-lbl">Insérées</div></div>
+            <div class="metric ov"><div class="m-val">${r.overflow||0}</div><div class="m-lbl">Débordement</div></div>
+            <div class="metric nw"><div class="m-val">${r.new_quartiers||0}</div><div class="m-lbl">Nvx quartiers</div></div>
+            <div class="metric dup"><div class="m-val">${r.duplicates||0}</div><div class="m-lbl">Doublons</div></div>
+            <div class="metric rej"><div class="m-val">${r.rejected_count||0}</div><div class="m-lbl">Rejetées</div></div>
+          </div>
+          ${rejHtml}
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function downloadMere() { window.location.href='/download'; showToast('⬇ Téléchargement en cours…','info'); }
+
+async function resetData() {
+  if (!confirm('⚠️ Réinitialiser toutes les données insérées ?\nLa structure du fichier mère sera conservée.')) return;
+  const r = await fetch('/reset', { method:'POST' });
+  const d = await r.json();
+  loadStats();
+  document.getElementById('results-panel').style.display = 'none';
+  showToast('✅ ' + d.message, 'success');
+}
+
+let toastTimer;
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className=''; }, 3500);
+}
+
+// ── Init based on role ────────────────────────────────────────────────────
+(function init() {
+  document.getElementById('h-user').textContent = USERNAME;
+  if (IS_ADMIN) {
+    document.getElementById('admin-btns').style.display = 'inline-flex';
+    document.getElementById('admin-panel').style.display = 'block';
+    loadAdminStats();
+    // Update stat labels for admin
+    document.querySelector('[data-lbl="ses"]') && (document.querySelector('[data-lbl="ses"]').textContent = 'Sessions (total)');
   }
+})();
+
+// ── Admin functions ───────────────────────────────────────────────────────
+async function loadAdminStats() {
+  try {
+    const r = await fetch('/admin/stats');
+    const d = await r.json();
+    countUp('s-pers', d.total_personnes || 0);
+    countUp('s-cum',  d.total_insere_cumule || 0);
+    countUp('s-ses',  d.nb_sessions || 0);
+    countUp('s-lig',  d.total_lignes_mere || 0);
+    renderAdminUsers(d.users || []);
+    renderAdminSessions(d.sessions || []);
+    document.getElementById('admin-sub').textContent =
+      `${(d.users||[]).length} utilisateur(s) — ${d.total_personnes} personnes enregistrées`;
+  } catch(e) {}
+}
+
+function renderAdminUsers(users) {
+  const el = document.getElementById('admin-users');
+  if (!users.length) { el.innerHTML='<p style="color:var(--muted);font-size:13px">Aucun utilisateur actif.</p>'; return; }
+  el.innerHTML = users.map(u => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-family:Cabinet Grotesk,sans-serif;font-size:15px;font-weight:800;color:#fff">${u.display}</div>
+        <button onclick="deleteUser('${u.username}')" title="Supprimer" style="width:24px;height:24px;border-radius:6px;background:rgba(255,71,87,.1);border:none;color:var(--danger);cursor:pointer;font-size:12px;">✕</button>
+      </div>
+      <div style="display:flex;gap:16px;">
+        <div><div style="font-family:Cabinet Grotesk,sans-serif;font-size:22px;font-weight:900;color:var(--accent)">${u.total_inserted}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Insérées</div></div>
+        <div><div style="font-family:Cabinet Grotesk,sans-serif;font-size:22px;font-weight:900;color:var(--text)">${u.nb_sessions}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Sessions</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;">Dernière activité : ${u.last_session}</div>
+    </div>`).join('');
+}
+
+function renderAdminSessions(sessions) {
+  const el = document.getElementById('admin-sessions');
+  if (!sessions.length) { el.innerHTML='<p style="color:var(--muted);font-size:13px">Aucune session.</p>'; return; }
+  el.innerHTML = [...sessions].reverse().map(s => `
+    <div style="display:grid;grid-template-columns:auto auto 1fr auto auto auto;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">
+      <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);flex-shrink:0;"></div>
+      <span style="font-size:11px;color:var(--accent2);font-weight:600;padding:2px 8px;background:rgba(0,153,255,.1);border-radius:5px;">${s.user||'?'}</span>
+      <span style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.file}</span>
+      <span style="font-size:10px;color:var(--muted);">${s.date.slice(0,16)}</span>
+      <span style="font-size:12px;color:var(--accent);font-weight:600;">+${s.inserted}</span>
+      <span style="font-size:11px;color:var(--muted);">${s.rejected} rej.</span>
+    </div>`).join('');
+}
+
+async function createUser() {
+  const u = document.getElementById('new-username').value.trim();
+  const p = document.getElementById('new-password').value.trim();
+  const msg = document.getElementById('create-msg');
+  if (!u || !p) { msg.style.color='var(--danger)'; msg.textContent='Remplissez les deux champs.'; return; }
+  const r = await fetch('/admin/users', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) });
+  const d = await r.json();
+  msg.style.color = d.ok ? 'var(--accent)' : 'var(--danger)';
+  msg.textContent = d.ok ? `✅ ${u} créé avec succès — Mot de passe : ${p}` : d.error;
+  if (d.ok) { document.getElementById('new-username').value=''; document.getElementById('new-password').value=''; loadAdminStats(); }
+}
+
+async function deleteUser(username) {
+  if (!confirm('Supprimer ' + username + ' ?')) return;
+  const r = await fetch('/admin/users/'+encodeURIComponent(username), { method:'DELETE' });
+  const d = await r.json();
+  if (d.ok) { showToast('✅ ' + d.message, 'success'); loadAdminStats(); }
+  else showToast('❌ ' + d.error, 'error');
+}
+
 </script>
 </body>
 </html>
