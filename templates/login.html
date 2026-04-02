@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connexion — Villages & Quartiers Bénin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;700;800;900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c10;--surface:#0f1419;--surface2:#161d26;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e8edf3;--muted:#6b7d8f;--accent:#00d68f;--danger:#ff4757;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.amb{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(120px);opacity:.3;}
+.a1{width:600px;height:600px;top:-200px;left:-100px;background:radial-gradient(circle,rgba(0,135,81,.5),transparent 70%);}
+.a2{width:400px;height:400px;bottom:-100px;right:10%;background:radial-gradient(circle,rgba(0,153,255,.3),transparent 70%);}
+.card{position:relative;z-index:10;width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;animation:fadeUp .5s ease both;}
+.logo{display:flex;align-items:center;gap:14px;margin-bottom:32px;}
+.flag-wrap{width:38px;height:26px;border-radius:5px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.1);flex-shrink:0;}
+.flag-wrap img{width:100%;height:100%;object-fit:cover;}
+.logo-text h1{font-family:'Cabinet Grotesk',sans-serif;font-size:14px;font-weight:800;color:#fff;line-height:1.2;}
+.logo-text span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+h2{font-family:'Cabinet Grotesk',sans-serif;font-size:22px;font-weight:900;color:#fff;margin-bottom:6px;}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:28px;}
+.field{margin-bottom:16px;}
+label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
+input{width:100%;padding:12px 16px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'Instrument Sans',sans-serif;font-size:14px;transition:border-color .2s;outline:none;}
+input:focus{border-color:var(--accent);}
+input::placeholder{color:var(--muted);}
+.btn-login{width:100%;margin-top:8px;padding:14px;background:linear-gradient(135deg,var(--accent),#00a876);border:none;border-radius:12px;font-family:'Cabinet Grotesk',sans-serif;font-size:14px;font-weight:800;color:#000;cursor:pointer;transition:all .25s;box-shadow:0 4px 24px rgba(0,214,143,.25);}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,214,143,.4);}
+.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.error-msg{display:none;margin-top:14px;padding:10px 14px;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.2);border-radius:8px;font-size:13px;color:var(--danger);}
+.error-msg.show{display:block;}
+.hint{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);text-align:center;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="amb a1"></div>
+<div class="amb a2"></div>
+<div class="card">
+  <div class="logo">
+    <div class="flag-wrap">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Flag_of_Benin.svg/900px-Flag_of_Benin.svg.png" alt="Bénin">
+    </div>
+    <div class="logo-text">
+      <h1>Villages &amp; Quartiers Bénin</h1>
+      <span>Système de centralisation</span>
+    </div>
+  </div>
+  <h2>Connexion</h2>
+  <p class="subtitle">Entrez vos identifiants pour accéder au système</p>
+  <div class="field">
+    <label>Prénom / Identifiant</label>
+    <input type="text" id="username" placeholder="Votre prénom" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>Mot de passe</label>
+    <input type="password" id="password" placeholder="Votre mot de passe" autocomplete="current-password">
+  </div>
+  <button class="btn-login" id="btn-login" onclick="doLogin()">Se connecter</button>
+  <div class="error-msg" id="err">Identifiants incorrects. Réessayez.</div>
+  <div class="hint">Contactez l'administrateur pour obtenir vos accès.</div>
+</div>
+<script>
+document.getElementById('password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('username').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('password').focus(); });
+
+async function doLogin() {
+  const btn = document.getElementById('btn-login');
+  const err = document.getElementById('err');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+  if (!username || !password) { err.textContent='Remplissez tous les champs.'; err.classList.add('show'); return; }
+  btn.disabled = true; btn.textContent = 'Connexion…';
+  try {
+    const r = await fetch('/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const d = await r.json();
+    if (d.ok) { window.location.href = '/'; }
+    else { err.textContent = d.error || 'Identifiants incorrects.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Se connecter'; }
+  } catch(e) { err.textContent='Erreur réseau.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Se connecter'; }
+}
+</script>
+</body>
+</html>
