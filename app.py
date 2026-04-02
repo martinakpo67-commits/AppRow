@@ -1,18 +1,23 @@
-import os, re, json, unicodedata, difflib, sqlite3, threading
+import os, re, json, unicodedata, difflib, sqlite3, threading, hashlib, secrets
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MERE_PATH  = os.path.join(BASE_DIR, "mere.xlsx")
 LOG_PATH   = os.path.join(BASE_DIR, "log.json")
+USERS_PATH = os.path.join(BASE_DIR, "users.json")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Admin password (set via Railway env var ADMIN_PASSWORD)
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin2026")
 
 NCOLS  = 9
 C_NEW  = "FFF2CC"
@@ -39,11 +44,75 @@ def load_log():
     if os.path.exists(LOG_PATH):
         with open(LOG_PATH, encoding="utf-8") as f:
             return json.load(f)
-    return {"sessions": [], "total_inserted": 0}
+    return {"sessions": [], "total_inserted": 0, "users": {}}
 
 def save_log(log):
     with open(LOG_PATH, "w", encoding="utf-8") as f:
         json.dump(log, f, ensure_ascii=False, indent=2)
+
+# ── User management ───────────────────────────────────────────────────────────
+
+def hash_pw(pw):
+    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
+
+def load_users():
+    if os.path.exists(USERS_PATH):
+        with open(USERS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_users(users):
+    with open(USERS_PATH, "w", encoding="utf-8") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+def get_user(username):
+    return load_users().get(username.lower().strip())
+
+def create_user(username, password):
+    users = load_users()
+    key = username.lower().strip()
+    if key in users:
+        return False, "Utilisateur déjà existant"
+    users[key] = {
+        "display": username.strip(),
+        "password": hash_pw(password),
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    save_users(users)
+    return True, "Utilisateur créé"
+
+def check_password(username, password):
+    user = get_user(username)
+    if not user: return False
+    return user["password"] == hash_pw(password)
+
+def is_admin():
+    return session.get("role") == "admin"
+
+def is_logged_in():
+    return session.get("username") is not None or is_admin()
+
+def current_username():
+    if is_admin(): return "__admin__"
+    return session.get("username", "")
+
+def require_login(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not is_logged_in():
+            return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
+
+def require_admin(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not is_admin():
+            return jsonify({"error": "Accès refusé"}), 403
+        return f(*args, **kwargs)
+    return decorated
 
 def get_db():
     global _db
@@ -200,7 +269,7 @@ def detect_columns(ws_in):
             return mapping, r
     return {}, None
 
-def integrate_file(filepath, filename):
+def integrate_file(filepath, filename, username=None):
     # ── Support .xls : convertir en xlsx à la volée ───────────────────────────
     if filepath.lower().endswith(".xls"):
         try:
@@ -541,10 +610,23 @@ def integrate_file(filepath, filename):
 
     log = load_log()
     log["total_inserted"] = log.get("total_inserted", 0) + inserted
+    if "users" not in log: log["users"] = {}
+    # Per-user stats
+    uname = username or "inconnu"
+    if uname not in log["users"]:
+        log["users"][uname] = {"total_inserted": 0, "sessions": []}
+    log["users"][uname]["total_inserted"] = log["users"][uname].get("total_inserted", 0) + inserted
+    log["users"][uname]["sessions"].append({
+        "file": filename, "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "inserted": inserted, "rejected": len(rejected),
+        "duplicates": duplicates, "overflow": overflow, "new_quartiers": new_quartier,
+    })
+    # Global sessions
     log["sessions"].append({
         "file": filename, "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "inserted": inserted, "rejected": len(rejected),
         "duplicates": duplicates, "overflow": overflow, "new_quartiers": new_quartier,
+        "user": uname,
     })
     save_log(log)
     con2 = get_db()
@@ -557,24 +639,71 @@ def integrate_file(filepath, filename):
         "total_cumule": log["total_inserted"],
     }
 
+
+# ── Auth Routes ───────────────────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET"])
+def login_page():
+    if is_logged_in():
+        return redirect(url_for("index"))
+    return render_template("login.html")
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json() or request.form
+    username = str(data.get("username","")).strip()
+    password = str(data.get("password","")).strip()
+
+    # Check admin
+    if password == ADMIN_PASSWORD and (username.lower() in ["admin","administrateur"] or password == ADMIN_PASSWORD):
+        if username.lower() in ["admin","administrateur"]:
+            session["role"] = "admin"
+            session["username"] = "admin"
+            return jsonify({"ok": True, "role": "admin"})
+
+    # Check regular user
+    if check_password(username, password):
+        session["username"] = username.lower().strip()
+        session["display"]  = get_user(username)["display"]
+        session["role"]     = "user"
+        return jsonify({"ok": True, "role": "user"})
+
+    return jsonify({"ok": False, "error": "Identifiants incorrects"}), 401
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login_page"))
+
+# ── Main App Routes ───────────────────────────────────────────────────────────
+
 @app.route("/")
+@require_login
 def index():
-    return render_template("index.html")
+    return render_template("index.html",
+        username=session.get("display", session.get("username","")),
+        is_admin=is_admin())
 
 @app.route("/upload", methods=["POST"])
+@require_login
 def upload():
     files = request.files.getlist("files")
     if not files:
         return jsonify({"error": "Aucun fichier recu"}), 400
+    uname = current_username()
     results = []
     for f in files:
         if not f.filename.lower().endswith((".xlsx", ".xls")):
             results.append({"filename": f.filename, "error": "Format non supporte"}); continue
-        fname    = secure_filename(f.filename)
-        filepath = os.path.join(UPLOAD_DIR, fname)
+
+        # ── Nom unique par utilisateur + timestamp pour éviter collisions ──
+        ext       = ".xls" if f.filename.lower().endswith(".xls") else ".xlsx"
+        unique_id = f"{uname}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}{ext}"
+        filepath  = os.path.join(UPLOAD_DIR, unique_id)
+
         f.save(filepath)
         try:
-            result = integrate_file(filepath, f.filename)
+            result = integrate_file(filepath, f.filename, username=uname)
             results.append(result)
         except Exception as e:
             results.append({"filename": f.filename, "error": str(e)})
@@ -584,11 +713,13 @@ def upload():
     return jsonify({"results": results, "log": load_log()})
 
 @app.route("/download")
+@require_admin
 def download():
     return send_file(MERE_PATH, as_attachment=True,
                      download_name="Villages_Quartiers_Benin_Final.xlsx")
 
 @app.route("/stats")
+@require_login
 def stats():
     log = load_log()
     con = get_db()
@@ -597,15 +728,85 @@ def stats():
     ws = wb.active
     total_lignes = ws.max_row
     wb.close()
+
+    uname = current_username()
+    user_stats = log.get("users", {}).get(uname, {})
+    user_sessions = user_stats.get("sessions", [])[-10:]
+    user_total = user_stats.get("total_inserted", 0)
+
     return jsonify({
         "total_lignes_mere":   total_lignes,
         "total_personnes":     total_personnes,
         "total_insere_cumule": log.get("total_inserted", 0),
         "nb_sessions":         len(log.get("sessions", [])),
         "sessions":            log.get("sessions", [])[-10:],
+        # User-specific
+        "user_sessions":       user_sessions,
+        "user_total_inserted": user_total,
+        "user_nb_sessions":    len(user_sessions),
+        "is_admin":            is_admin(),
     })
 
+@app.route("/admin/stats")
+@require_admin
+def admin_stats():
+    """Stats complètes par utilisateur pour l'admin."""
+    log = load_log()
+    users_data = load_users()
+    con = get_db()
+    total_personnes = con.execute("SELECT SUM(filled) FROM slots").fetchone()[0] or 0
+
+    user_summary = []
+    for uname, udata in log.get("users", {}).items():
+        display = users_data.get(uname, {}).get("display", uname) if uname != "__admin__" else "Admin"
+        user_summary.append({
+            "username":       uname,
+            "display":        display,
+            "total_inserted": udata.get("total_inserted", 0),
+            "nb_sessions":    len(udata.get("sessions", [])),
+            "last_session":   udata["sessions"][-1]["date"] if udata.get("sessions") else "—",
+        })
+    user_summary.sort(key=lambda x: x["total_inserted"], reverse=True)
+
+    wb = load_workbook(MERE_PATH, read_only=True)
+    ws = wb.active
+    total_lignes = ws.max_row
+    wb.close()
+
+    return jsonify({
+        "total_lignes_mere":   total_lignes,
+        "total_personnes":     total_personnes,
+        "total_insere_cumule": log.get("total_inserted", 0),
+        "nb_sessions":         len(log.get("sessions", [])),
+        "sessions":            log.get("sessions", [])[-20:],
+        "users":               user_summary,
+        "all_users":           list(users_data.keys()),
+    })
+
+@app.route("/admin/users", methods=["POST"])
+@require_admin
+def create_user_route():
+    data = request.get_json() or {}
+    username = str(data.get("username","")).strip()
+    password = str(data.get("password","")).strip()
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Prénom et mot de passe requis"}), 400
+    ok, msg = create_user(username, password)
+    return jsonify({"ok": ok, "message": msg})
+
+@app.route("/admin/users/<username>", methods=["DELETE"])
+@require_admin
+def delete_user_route(username):
+    users = load_users()
+    key = username.lower().strip()
+    if key not in users:
+        return jsonify({"ok": False, "error": "Utilisateur introuvable"}), 404
+    del users[key]
+    save_users(users)
+    return jsonify({"ok": True, "message": f"{username} supprimé"})
+
 @app.route("/reset", methods=["POST"])
+@require_admin
 def reset():
     with write_lock:
         wb = load_workbook(MERE_PATH)
@@ -620,7 +821,7 @@ def reset():
         if ws.max_row > ORIGINAL_MAX:
             ws.delete_rows(ORIGINAL_MAX+1, ws.max_row - ORIGINAL_MAX)
         wb.save(MERE_PATH)
-        save_log({"sessions": [], "total_inserted": 0})
+        save_log({"sessions": [], "total_inserted": 0, "users": {}})
         invalidate_db()
     return jsonify({"message": f"{count} lignes reinitalisees"})
 
