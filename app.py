@@ -12,6 +12,7 @@ app.config["SESSION_COOKIE_SECURE"]   = False
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_NAME"]     = "approw_session"
+
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MERE_PATH  = os.path.join(BASE_DIR, "mere.xlsx")
 LOG_PATH   = os.path.join(BASE_DIR, "log.json")
@@ -135,34 +136,74 @@ def build_index_db():
     con = sqlite3.connect(":memory:", check_same_thread=False)
     con.execute("""CREATE TABLE slots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        village TEXT, village_norm TEXT, arrond_norm TEXT,
+        village TEXT, village_norm TEXT,
+        dept_norm TEXT, comm_norm TEXT, arrond_norm TEXT,
         row_start INTEGER, filled INTEGER, last_data_row INTEGER)""")
     con.execute("CREATE TABLE phones (phone TEXT PRIMARY KEY)")
-    con.execute("CREATE TABLE arrond_last (arrond_norm TEXT PRIMARY KEY, last_data_row INTEGER)")
+    # arrond index: arrond_norm -> last_data_row + next_dept_row
+    con.execute("""CREATE TABLE arrond_index (
+        arrond_norm TEXT PRIMARY KEY,
+        dept_norm TEXT, comm_norm TEXT,
+        arrond_row INTEGER, hdr_row INTEGER,
+        last_data_row INTEGER, next_dept_row INTEGER)""")
+
+    dept_norm = comm_norm = arrond_norm = ""
+    dept_row = arrond_row = hdr_row = 0
+    arrond_data = {}   # arrond_norm -> dict
     slots = []
     phones = []
-    arrond_rows = {}
-    arrond_norm_cur = ""
-    for r, row in enumerate(ws.iter_rows(values_only=True), 1):
+
+    all_rows = list(ws.iter_rows(values_only=True))
+    total_rows = len(all_rows)
+
+    for i, row in enumerate(all_rows):
+        r  = i + 1
         v1 = str(row[0] or "").strip()
         v5 = str(row[4] or "").strip() if len(row) > 4 else ""
         v2 = str(row[1] or "").strip() if len(row) > 1 else ""
         v9 = str(row[8] or "").strip() if len(row) > 8 else ""
-        if "ARRONDISSEMENT" in v1 and v1[:1].isdigit():
-            arrond_norm_cur = normalize(v1)
-        if v1 == "1" and v2 and arrond_norm_cur:
-            slots.append((v2, normalize(v2), arrond_norm_cur, r, 0, r+4))
-        if v1 in ["1","2","3","4","5"] and arrond_norm_cur:
-            arrond_rows[arrond_norm_cur] = r
+
+        if "DEPARTEMENT" in v1.upper():
+            # Close previous arrond block
+            if arrond_norm and arrond_norm in arrond_data:
+                arrond_data[arrond_norm]["next_dept_row"] = r
+            dept_norm = normalize(v1.replace("DEPARTEMENT:", "").strip())
+            comm_norm = normalize(v5.replace("COMMUNE:", "").strip())
+
+        elif "ARRONDISSEMENT" in v1.upper():
+            arrond_norm = normalize(v1)
+            arrond_row  = r
+            arrond_data[arrond_norm] = {
+                "dept_norm": dept_norm, "comm_norm": comm_norm,
+                "arrond_row": r, "hdr_row": 0,
+                "last_data_row": r, "next_dept_row": total_rows + 1
+            }
+
+        elif v1 == "N\u00b0" and arrond_norm:
+            arrond_data[arrond_norm]["hdr_row"] = r
+
+        elif v1 == "1" and v2 and arrond_norm:
+            slots.append((v2, normalize(v2), dept_norm, comm_norm, arrond_norm, r, 0, r + 4))
+
+        if v1 in ["1","2","3","4","5"] and arrond_norm:
+            arrond_data[arrond_norm]["last_data_row"] = r
+
         if v9:
             p = clean_phone(v9)
             if p: phones.append((p,))
+
     wb.close()
+
     con.executemany(
-        "INSERT INTO slots(village,village_norm,arrond_norm,row_start,filled,last_data_row) VALUES(?,?,?,?,?,?)",
+        "INSERT INTO slots(village,village_norm,dept_norm,comm_norm,arrond_norm,row_start,filled,last_data_row) VALUES(?,?,?,?,?,?,?,?)",
         slots)
     con.executemany("INSERT OR IGNORE INTO phones VALUES(?)", phones)
-    con.executemany("INSERT OR REPLACE INTO arrond_last VALUES(?,?)", list(arrond_rows.items()))
+    con.executemany(
+        "INSERT OR REPLACE INTO arrond_index VALUES(?,?,?,?,?,?,?)",
+        [(k, v["dept_norm"], v["comm_norm"], v["arrond_row"], v["hdr_row"],
+          v["last_data_row"], v["next_dept_row"])
+         for k, v in arrond_data.items()])
+
     # Compute actual filled counts
     wb2 = load_workbook(MERE_PATH, read_only=True)
     ws2 = wb2.active
@@ -177,27 +218,94 @@ def build_index_db():
                 con.execute("UPDATE slots SET filled=MAX(filled,?), last_data_row=MAX(last_data_row,?) WHERE id=?",
                             (int(v1), r, sid))
     wb2.close()
-    con.execute("CREATE INDEX idx_vn ON slots(village_norm)")
-    con.execute("CREATE INDEX idx_an ON slots(arrond_norm)")
+
+    con.execute("CREATE INDEX idx_vn  ON slots(village_norm)")
+    con.execute("CREATE INDEX idx_an  ON slots(arrond_norm)")
+    con.execute("CREATE INDEX idx_van ON slots(village_norm, arrond_norm)")
     con.commit()
+
     elapsed = (datetime.now() - t0).total_seconds()
-    n = con.execute("SELECT COUNT(*) FROM slots").fetchone()[0]
+    n  = con.execute("SELECT COUNT(*) FROM slots").fetchone()[0]
     np = con.execute("SELECT COUNT(*) FROM phones").fetchone()[0]
-    print(f"   \u2705 Index pr\u00eat en {elapsed:.1f}s \u2014 {n} villages, {np} t\u00e9l.", flush=True)
+    na = con.execute("SELECT COUNT(*) FROM arrond_index").fetchone()[0]
+    print(f"   \u2705 Index pr\u00eat en {elapsed:.1f}s \u2014 {n} villages, {na} arrond., {np} t\u00e9l.", flush=True)
     return con
 
-def find_slot(con, quartier):
+def find_slot(con, quartier, arrond_norm_ctx=None, dept_norm_ctx=None, comm_norm_ctx=None):
+    """
+    Cherche un slot par quartier avec contexte géographique précis.
+    Priorité : dept+comm+arrond > arrond seul > global
+    Cela évite de confondre deux quartiers homonymes dans des arronds différents.
+    """
     key = normalize(quartier)
+
+    # ── Niveau 1 : Dept + Commune + Arrond (le plus précis) ──────────────────
+    if dept_norm_ctx and comm_norm_ctx and arrond_norm_ctx:
+        row = con.execute(
+            "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots "
+            "WHERE village_norm=? AND dept_norm=? AND comm_norm=? AND arrond_norm=? LIMIT 1",
+            (key, dept_norm_ctx, comm_norm_ctx, arrond_norm_ctx)).fetchone()
+        if row: return row
+        # Fuzzy dans dept+comm+arrond
+        keys = [r[0] for r in con.execute(
+            "SELECT DISTINCT village_norm FROM slots "
+            "WHERE dept_norm=? AND comm_norm=? AND arrond_norm=?",
+            (dept_norm_ctx, comm_norm_ctx, arrond_norm_ctx)).fetchall()]
+        matches = difflib.get_close_matches(key, keys, n=1, cutoff=0.85)
+        if matches:
+            row = con.execute(
+                "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots "
+                "WHERE village_norm=? AND dept_norm=? AND comm_norm=? AND arrond_norm=? LIMIT 1",
+                (matches[0], dept_norm_ctx, comm_norm_ctx, arrond_norm_ctx)).fetchone()
+            if row: return row
+
+    # ── Niveau 2 : Arrond seul ────────────────────────────────────────────────
+    if arrond_norm_ctx:
+        row = con.execute(
+            "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots "
+            "WHERE village_norm=? AND arrond_norm=? LIMIT 1",
+            (key, arrond_norm_ctx)).fetchone()
+        if row: return row
+        keys = [r[0] for r in con.execute(
+            "SELECT DISTINCT village_norm FROM slots WHERE arrond_norm=?",
+            (arrond_norm_ctx,)).fetchall()]
+        matches = difflib.get_close_matches(key, keys, n=1, cutoff=0.85)
+        if matches:
+            row = con.execute(
+                "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots "
+                "WHERE village_norm=? AND arrond_norm=? LIMIT 1",
+                (matches[0], arrond_norm_ctx)).fetchone()
+            if row: return row
+
+    # ── Niveau 3 : Global (fallback si aucun contexte) ───────────────────────
     row = con.execute(
-        "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots WHERE village_norm=? LIMIT 1",
-        (key,)).fetchone()
+        "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots "
+        "WHERE village_norm=? LIMIT 1", (key,)).fetchone()
     if row: return row
     all_keys = [r[0] for r in con.execute("SELECT DISTINCT village_norm FROM slots").fetchall()]
     matches = difflib.get_close_matches(key, all_keys, n=1, cutoff=0.85)
     if matches:
         return con.execute(
-            "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots WHERE village_norm=? LIMIT 1",
-            (matches[0],)).fetchone()
+            "SELECT id,village,row_start,filled,last_data_row,arrond_norm FROM slots "
+            "WHERE village_norm=? LIMIT 1", (matches[0],)).fetchone()
+    return None
+
+
+def find_arrond_in_mere(con, arrond_name):
+    """Cherche l'arrondissement dans le fichier mère par fuzzy matching."""
+    key = normalize(arrond_name)
+    # Exact
+    row = con.execute(
+        "SELECT arrond_norm, last_data_row, next_dept_row, hdr_row FROM arrond_index "
+        "WHERE arrond_norm=? LIMIT 1", (key,)).fetchone()
+    if row: return row
+    # Fuzzy
+    all_keys = [r[0] for r in con.execute("SELECT arrond_norm FROM arrond_index").fetchall()]
+    matches = difflib.get_close_matches(key, all_keys, n=1, cutoff=0.80)
+    if matches:
+        return con.execute(
+            "SELECT arrond_norm, last_data_row, next_dept_row, hdr_row FROM arrond_index "
+            "WHERE arrond_norm=? LIMIT 1", (matches[0],)).fetchone()
     return None
 
 def style_new_row(ws, rn):
@@ -407,9 +515,25 @@ def integrate_file(filepath, filename, username=None):
             "lieu_naissance": gv(r, "lieu_naissance"),
         }
 
-    persons = []; rejected = []; seen_phones = set(); last_quartier = None
+    persons = []; rejected = []; seen_phones = set()
+    last_quartier = None
+    last_arrond_ctx = None   # ← arrondissement courant du fichier source
+    last_dept_ctx   = None   # ← département courant du fichier source
+    last_comm_ctx   = None   # ← commune courante du fichier source
 
     for r in range(1, ws_in.max_row+1):
+        # Détecter DEPARTEMENT / COMMUNE / ARRONDISSEMENT dans le fichier source
+        for c in range(1, min(ws_in.max_column+1, 6)):
+            cv = str(ws_in.cell(row=r, column=c).value or "").strip()
+            cv_up = cv.upper()
+            if "DEPARTEMENT" in cv_up:
+                last_dept_ctx = normalize(cv.replace("DEPARTEMENT:","").replace("DEPARTEMENT :","").strip())
+            if "COMMUNE" in cv_up:
+                last_comm_ctx = normalize(cv.replace("COMMUNE:","").replace("COMMUNE :","").strip())
+            if "ARRONDISSEMENT" in cv_up:
+                last_arrond_ctx = normalize(cv)
+                break
+
         for c in range(1, min(ws_in.max_column+1, 6)):
             cv = str(ws_in.cell(row=r, column=c).value or "").strip()
             m = re.match(r"^QUARTIER\s*[:\-]\s*(.+)", cv, re.IGNORECASE)
@@ -450,7 +574,10 @@ def integrate_file(filepath, filename, username=None):
                              "reason": f"Doublon interne : {tel_raw}"}); continue
         seen_phones.add(tel)
         persons.append({"row": r, "quartier": quartier, "nom": nom, "prenom": prenom,
-                        **extras, "telephone": tel_raw, "tel_clean": tel})
+                        **extras, "telephone": tel_raw, "tel_clean": tel,
+                        "arrond_ctx": last_arrond_ctx,
+                        "dept_ctx":   last_dept_ctx,
+                        "comm_ctx":   last_comm_ctx})
 
     with write_lock:
         con    = get_db()
@@ -480,18 +607,23 @@ def integrate_file(filepath, filename, username=None):
                 rejected.append({"row": p["row"], "quartier": p["quartier"], "nom": p["nom"],
                                  "reason": f"Doublon tel : {p['telephone']}"}); continue
 
-            slot = find_slot(con, p["quartier"])
+            # Cherche le slot avec le contexte géographique complet
+            arrond_ctx = p.get("arrond_ctx")
+            dept_ctx   = p.get("dept_ctx")
+            comm_ctx   = p.get("comm_ctx")
+            slot = find_slot(con, p["quartier"],
+                             arrond_norm_ctx=arrond_ctx,
+                             dept_norm_ctx=dept_ctx,
+                             comm_norm_ctx=comm_ctx)
 
             if slot:
                 sid, village, row_start, filled, last_data_row, arrond_n = slot
                 current_filled = slot_fill_count.get(sid, filled)
 
                 if current_filled < 5:
-                    # Écriture directe sur slot pré-alloué (N° 1 à 5)
                     target_row = row_start + current_filled
                     direct_writes.append((target_row, current_filled + 1, village, p))
                 else:
-                    # Débordement → regrouper par village pour une seule insertion groupée
                     if sid not in overflow_groups:
                         overflow_groups[sid] = {
                             "village":      village,
@@ -507,13 +639,39 @@ def integrate_file(filepath, filename, username=None):
                 inserted += 1
 
             else:
-                # Nouveau village → regrouper par nom de quartier
+                # ── Nouveau village → insérer à la fin de son arrondissement ──
+                insert_after = ws_out.max_row  # fallback = fin de fichier
+                arrond_ctx = p.get("arrond_ctx")
+                dept_ctx   = p.get("dept_ctx")
+                comm_ctx   = p.get("comm_ctx")
+
+                if arrond_ctx:
+                    # Cherche l'arrond exact avec dept+comm pour éviter les homonymes
+                    arrond_info = None
+                    if dept_ctx and comm_ctx:
+                        row_ai = con.execute(
+                            "SELECT arrond_norm, last_data_row, next_dept_row, hdr_row "
+                            "FROM arrond_index WHERE arrond_norm=? AND dept_norm=? AND comm_norm=? LIMIT 1",
+                            (arrond_ctx, dept_ctx, comm_ctx)).fetchone()
+                        if row_ai: arrond_info = row_ai
+                    if not arrond_info:
+                        arrond_info = find_arrond_in_mere(con, arrond_ctx)
+                    if arrond_info:
+                        _, last_data, next_dept, hdr_row = arrond_info
+                        insert_after = last_data  # juste après le dernier slot de l'arrond
+
                 key = normalize(p["quartier"])
-                existing = next((g for g in new_village_list if normalize(g["quartier"]) == key), None)
+                existing = next((g for g in new_village_list if normalize(g["quartier"]) == key
+                                and g.get("arrond_ctx") == arrond_ctx), None)
                 if existing:
                     existing["persons"].append(p)
                 else:
-                    new_village_list.append({"quartier": p["quartier"], "persons": [p]})
+                    new_village_list.append({
+                        "quartier": p["quartier"],
+                        "insert_after": insert_after,
+                        "arrond_ctx": arrond_ctx,
+                        "persons": [p]
+                    })
                 new_quartier += 1
                 phones_to_add.append(tel)
                 inserted += 1
@@ -563,14 +721,18 @@ def integrate_file(filepath, filename, username=None):
                 style_inserted_row(ws_out, rn)
                 write_to_row(ws_out, rn, start_num + i, village, p)
 
-        # ── Phase 5 : Nouveaux villages ajoutés en fin de fichier ────────────
-        # (fin de fichier = après tous les décalages dus aux inserts ci-dessus)
+        # ── Phase 5 : Nouveaux villages insérés à la bonne position ─────────
+        # Trier par insert_after DESC pour ne pas corrompre les positions
+        new_village_list.sort(key=lambda x: x["insert_after"], reverse=True)
+
         for nv in new_village_list:
             count    = len(nv["persons"])
-            base_row = ws_out.max_row + 1
-            ws_out.insert_rows(base_row, amount=count)
+            # insert_after = dernière ligne de données de l'arrond
+            # → insérer juste après = avant la prochaine DEPARTEMENT row
+            insert_at = nv["insert_after"] + 1
+            ws_out.insert_rows(insert_at, amount=count)
             for i, p in enumerate(nv["persons"]):
-                rn = base_row + i
+                rn = insert_at + i
                 style_inserted_row(ws_out, rn)
                 write_to_row(ws_out, rn, i + 1, nv["quartier"], p)
 
@@ -850,4 +1012,3 @@ else:
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
-# v4-auth
