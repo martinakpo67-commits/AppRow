@@ -8,7 +8,10 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
-
+app.config["SESSION_COOKIE_SECURE"]   = False
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_NAME"]     = "approw_session"
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MERE_PATH  = os.path.join(BASE_DIR, "mere.xlsx")
 LOG_PATH   = os.path.join(BASE_DIR, "log.json")
