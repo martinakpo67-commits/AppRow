@@ -8,6 +8,11 @@
 <style>
 :root{--bg:#080c10;--surface:#0f1419;--surface2:#161d26;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e8edf3;--muted:#6b7d8f;--accent:#00d68f;--danger:#ff4757;}
 *{margin:0;padding:0;box-sizing:border-box;}
+/* Light mode */
+html.light{--bg:#f0f4f8;--surface:#ffffff;--surface2:#f5f7fa;--border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);--text:#0f1923;--muted:#7a8a9a;}
+html.light .amb{opacity:.1;}
+html.light .card{background:#fff;border-color:rgba(0,0,0,.1);}
+html.light input{background:#f5f7fa;border-color:rgba(0,0,0,.14);color:#0f1923;}
 body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;}
 .amb{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(120px);opacity:.3;}
 .a1{width:600px;height:600px;top:-200px;left:-100px;background:radial-gradient(circle,rgba(0,135,81,.5),transparent 70%);}
@@ -55,13 +60,45 @@ input::placeholder{color:var(--muted);}
   </div>
   <div class="field">
     <label>Mot de passe</label>
-    <input type="password" id="password" placeholder="Votre mot de passe" autocomplete="current-password">
+    <div style="position:relative;">
+      <input type="password" id="password" placeholder="Votre mot de passe" autocomplete="current-password" style="padding-right:44px;">
+      <button type="button" onclick="togglePw()" id="pw-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:0;line-height:1;">👁</button>
+    </div>
   </div>
   <button class="btn-login" id="btn-login" onclick="doLogin()">Se connecter</button>
   <div class="error-msg" id="err">Identifiants incorrects. Réessayez.</div>
   <div class="hint">Contactez l'administrateur pour obtenir vos accès.</div>
+  <div style="text-align:center;margin-top:12px;">
+    <button id="theme-btn-login" onclick="toggleTheme()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);" title="Changer le thème">🌙</button>
+  </div>
 </div>
 <script>
+// Theme
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.getElementById('theme-btn-login');
+  if (html.classList.contains('light')) {
+    html.classList.remove('light'); btn.textContent='🌙';
+    localStorage.setItem('theme','dark');
+  } else {
+    html.classList.add('light'); btn.textContent='☀️';
+    localStorage.setItem('theme','light');
+  }
+}
+// Apply saved theme
+if (localStorage.getItem('theme') === 'light') {
+  document.documentElement.classList.add('light');
+  setTimeout(()=>{ const b=document.getElementById('theme-btn-login'); if(b) b.textContent='☀️'; },0);
+}
+
+// Password visibility
+function togglePw() {
+  const inp = document.getElementById('password');
+  const eye = document.getElementById('pw-eye');
+  if (inp.type === 'password') { inp.type='text'; eye.textContent='🙈'; }
+  else { inp.type='password'; eye.textContent='👁'; }
+}
+
 document.getElementById('password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 document.getElementById('username').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('password').focus(); });
 
