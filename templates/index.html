@@ -330,6 +330,10 @@ input[type=file]{display:none;}
 <div id="toast"></div>
 
 <script>
+// ── Variables injectées par Flask ─────────────────────────────────────────
+const IS_ADMIN = {{ is_admin | tojson }};
+const USERNAME = {{ username | tojson }};
+
 let selectedFiles = [];
 
 async function loadStats() {
