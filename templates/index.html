@@ -205,6 +205,14 @@ input[type=file]{display:none;}
     </div>
     <span class="pill">v4</span>
   </div>
+
+  <!-- Bouton admin centré - visible seulement pour l'admin -->
+  <div id="admin-center-btn" style="display:none;">
+    <button onclick="window.location='/admin-panel'" class="btn" style="background:rgba(0,214,143,.1);border:1px solid rgba(0,214,143,.25);color:var(--accent);font-weight:600;gap:8px;padding:9px 20px;border-radius:10px;font-size:13px;">
+      👥 Utilisateurs
+    </button>
+  </div>
+
   <div class="h-btns" style="align-items:center;gap:8px;">
     <span style="font-size:12px;color:var(--muted);margin-right:4px;">👤 <span id="h-user"></span></span>
     <span id="admin-btns" style="display:none;gap:8px;align-items:center;">
@@ -546,8 +554,9 @@ function showToast(msg, type='info') {
   document.getElementById('h-user').textContent = USERNAME;
   if (IS_ADMIN) {
     document.getElementById('admin-btns').style.display = 'inline-flex';
-    document.getElementById('admin-panel').style.display = 'block';
-    loadAdminStats();
+    document.getElementById('admin-center-btn').style.display = 'block';
+    document.getElementById('admin-panel').style.display = 'none'; // panel now on separate page
+    loadAdminStats(); // still load for stats ribbon
     // Update stat labels for admin
     document.querySelector('[data-lbl="ses"]') && (document.querySelector('[data-lbl="ses"]').textContent = 'Sessions (total)');
   }
