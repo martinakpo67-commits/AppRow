@@ -881,7 +881,16 @@ def integrate_file(filepath, filename, username=None):
 
             for i, p in enumerate(group["persons"]):
                 rn = insert_at + i
-                write_to_row(ws_out, rn, start_num + i, village, p)        # ── Phase 5 : Nouveaux villages GROUPÉS par position ─────────────────
+                write_to_row(ws_out, rn, start_num + i, village, p)
+
+        # ── Mise à jour last_data_row dans DB après overflows ───────────────
+        for sid_ov, group in overflow_groups.items():
+            new_last = group["insert_after"] + len(group["persons"])
+            con.execute(
+                "UPDATE slots SET last_data_row=MAX(last_data_row,?), filled=filled+? WHERE id=?",
+                (new_last, len(group["persons"]), sid_ov))
+
+        # ── Phase 5 : Nouveaux villages GROUPÉS par position ─────────────────
         # Grouper les villages par insert_after → une seule insert_rows par groupe
         from collections import defaultdict as _dd
         _pos_groups = _dd(list)
@@ -1097,14 +1106,15 @@ def admin_stats():
     log = load_log()
     users_data = load_users()
     con = get_db()
-    total_personnes = con.execute("SELECT SUM(filled) FROM slots").fetchone()[0] or 0
+    total_personnes = con.execute("SELECT COUNT(*) FROM phones").fetchone()[0] or 0
 
     user_summary = []
-    for uname, udata in log.get("users", {}).items():
-        display = users_data.get(uname, {}).get("display", uname) if uname != "__admin__" else "Admin"
+    # Partir de users.json (tous les utilisateurs) pas du log (seulement ceux avec sessions)
+    for uname, uinfo in users_data.items():
+        udata = log.get("users", {}).get(uname, {})
         user_summary.append({
             "username":       uname,
-            "display":        display,
+            "display":        uinfo.get("display", uname),
             "total_inserted": udata.get("total_inserted", 0),
             "nb_sessions":    len(udata.get("sessions", [])),
             "last_session":   udata["sessions"][-1]["date"] if udata.get("sessions") else "—",
@@ -1135,7 +1145,10 @@ def create_user_route():
     if not username or not password:
         return jsonify({"ok": False, "error": "Prénom et mot de passe requis"}), 400
     ok, msg = create_user(username, password)
-    return jsonify({"ok": ok, "message": msg})
+    if ok:
+        return jsonify({"ok": True, "message": msg})
+    else:
+        return jsonify({"ok": False, "error": msg})
 
 @app.route("/admin/users/<username>", methods=["DELETE"])
 @require_admin
