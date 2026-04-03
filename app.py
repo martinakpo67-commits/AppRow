@@ -195,9 +195,12 @@ def build_index_db():
     wb.close()
 
     # Calculer filled directement depuis all_rows (déjà en mémoire — pas besoin de relire)
-    row_to_slot_idx = {}  # row_start -> index dans slots[]
+    row_to_slot_idx  = {}  # row_start -> index dans slots[]
+    village_to_slot_idx = {}  # village_norm -> index (pour overflow N>5)
     for idx, s in enumerate(slots):
         row_to_slot_idx[s[5]] = idx  # s[5] = row_start
+        if s[1] not in village_to_slot_idx:   # s[1] = village_norm
+            village_to_slot_idx[s[1]] = idx
 
     filled_counts  = [0] * len(slots)
     last_data_rows = [s[7] for s in slots]  # s[7] = last_data_row initial
@@ -205,12 +208,23 @@ def build_index_db():
     for i, row in enumerate(all_rows):
         r  = i + 1
         v1 = str(row[0] or "").strip()
+        v2 = str(row[1] or "").strip() if len(row) > 1 else ""
         v3 = str(row[2] or "").strip() if len(row) > 2 else ""
-        if v1 in ["1","2","3","4","5"] and v3:
-            slot_row = r - (int(v1) - 1)
+        if not v1.isdigit() or not v3: continue
+        n = int(v1)
+        if n >= 1 and n <= 5:
+            # Ligne normale (N=1-5) → mise à jour filled + last_data_row
+            slot_row = r - (n - 1)
             if slot_row in row_to_slot_idx:
                 idx = row_to_slot_idx[slot_row]
-                filled_counts[idx]  = max(filled_counts[idx], int(v1))
+                filled_counts[idx]  = max(filled_counts[idx], n)
+                last_data_rows[idx] = max(last_data_rows[idx], r)
+        elif n > 5 and v2:
+            # Ligne overflow (N>5) → mise à jour filled ET last_data_row
+            v2_norm = normalize(v2)
+            if v2_norm in village_to_slot_idx:
+                idx = village_to_slot_idx[v2_norm]
+                filled_counts[idx]  = max(filled_counts[idx], n)  # ← compter overflow aussi
                 last_data_rows[idx] = max(last_data_rows[idx], r)
 
     # Appliquer les filled counts
@@ -649,7 +663,8 @@ def integrate_file(filepath, filename, username=None):
             slot_state[sid] = {"village": village, "row_start": row_start,
                                "filled": filled, "last_data_row": last_data_row}
 
-        slot_fill_count = {}  # sid -> filled count courant
+        slot_fill_count  = {}  # sid -> filled count courant
+        slot_lock        = {}  # (village_norm, arrond_ctx) -> sid (verrou de session)
 
         # ── Pré-charger les arronds en mémoire (évite 100s de requêtes SQL) ──
         arrond_cache = {}
@@ -731,7 +746,22 @@ def integrate_file(filepath, filename, username=None):
             arrond_ctx = p.get("arrond_ctx")
             dept_ctx   = p.get("dept_ctx")
             comm_ctx   = p.get("comm_ctx")
-            slot = find_slot_fast(p["quartier"], arrond_ctx=arrond_ctx, dept_ctx=dept_ctx, comm_ctx=comm_ctx)
+
+            # ── Verrou de session : même village → même slot ──────────────────
+            lock_key = (normalize(p["quartier"]), arrond_ctx or "")
+            if lock_key in slot_lock:
+                # Réutiliser le slot déjà choisi pour ce village dans cette session
+                locked_sid = slot_lock[lock_key]
+                slot = next(
+                    (s[:6] for s in all_slots_by_norm.get(normalize(p["quartier"]), [])
+                     if s[0] == locked_sid),
+                    None
+                )
+            else:
+                slot = find_slot_fast(p["quartier"], arrond_ctx=arrond_ctx,
+                                      dept_ctx=dept_ctx, comm_ctx=comm_ctx)
+                if slot:
+                    slot_lock[lock_key] = slot[0]  # verrouiller ce sid
 
             if slot:
                 sid, village, row_start, filled, last_data_row, arrond_n = slot
@@ -742,9 +772,14 @@ def integrate_file(filepath, filename, username=None):
                     direct_writes.append((target_row, current_filled + 1, village, p))
                 else:
                     if sid not in overflow_groups:
+                        # Utiliser last_data_row depuis la DB (pas le cache slot_state)
+                        # pour tenir compte des overflows des sessions précédentes
+                        actual_last = con.execute(
+                            "SELECT last_data_row FROM slots WHERE id=?", (sid,)
+                        ).fetchone()[0]
                         overflow_groups[sid] = {
                             "village":      village,
-                            "insert_after": slot_state[sid]["last_data_row"],
+                            "insert_after": actual_last,
                             "start_num":    current_filled + 1,
                             "persons":      []
                         }
