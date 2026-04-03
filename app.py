@@ -194,30 +194,40 @@ def build_index_db():
 
     wb.close()
 
+    # Calculer filled directement depuis all_rows (déjà en mémoire — pas besoin de relire)
+    row_to_slot_idx = {}  # row_start -> index dans slots[]
+    for idx, s in enumerate(slots):
+        row_to_slot_idx[s[5]] = idx  # s[5] = row_start
+
+    filled_counts  = [0] * len(slots)
+    last_data_rows = [s[7] for s in slots]  # s[7] = last_data_row initial
+
+    for i, row in enumerate(all_rows):
+        r  = i + 1
+        v1 = str(row[0] or "").strip()
+        v3 = str(row[2] or "").strip() if len(row) > 2 else ""
+        if v1 in ["1","2","3","4","5"] and v3:
+            slot_row = r - (int(v1) - 1)
+            if slot_row in row_to_slot_idx:
+                idx = row_to_slot_idx[slot_row]
+                filled_counts[idx]  = max(filled_counts[idx], int(v1))
+                last_data_rows[idx] = max(last_data_rows[idx], r)
+
+    # Appliquer les filled counts
+    slots_with_filled = [
+        (s[0], s[1], s[2], s[3], s[4], s[5], filled_counts[i], last_data_rows[i])
+        for i, s in enumerate(slots)
+    ]
+
     con.executemany(
         "INSERT INTO slots(village,village_norm,dept_norm,comm_norm,arrond_norm,row_start,filled,last_data_row) VALUES(?,?,?,?,?,?,?,?)",
-        slots)
+        slots_with_filled)
     con.executemany("INSERT OR IGNORE INTO phones VALUES(?)", phones)
     con.executemany(
         "INSERT OR REPLACE INTO arrond_index VALUES(?,?,?,?,?,?,?)",
         [(k, v["dept_norm"], v["comm_norm"], v["arrond_row"], v["hdr_row"],
           v["last_data_row"], v["next_dept_row"])
          for k, v in arrond_data.items()])
-
-    # Compute actual filled counts
-    wb2 = load_workbook(MERE_PATH, read_only=True)
-    ws2 = wb2.active
-    row_to_id = {r: sid for sid, r in con.execute("SELECT id, row_start FROM slots").fetchall()}
-    for r, row in enumerate(ws2.iter_rows(values_only=True), 1):
-        v1 = str(row[0] or "").strip()
-        v3 = str(row[2] or "").strip() if len(row) > 2 else ""
-        if v1 in ["1","2","3","4","5"] and v3:
-            slot_row = r - (int(v1) - 1)
-            if slot_row in row_to_id:
-                sid = row_to_id[slot_row]
-                con.execute("UPDATE slots SET filled=MAX(filled,?), last_data_row=MAX(last_data_row,?) WHERE id=?",
-                            (int(v1), r, sid))
-    wb2.close()
 
     con.execute("CREATE INDEX idx_vn  ON slots(village_norm)")
     con.execute("CREATE INDEX idx_an  ON slots(arrond_norm)")
@@ -357,15 +367,19 @@ def split_nom_prenom(full_name):
     if len(parts) == 1: return parts[0], parts[0]
     return parts[0], ' '.join(parts[1:])
 
-def detect_columns(ws_in):
+def detect_columns(ws_in, max_col=30):
     """
     Détecte les colonnes en scannant les premières lignes.
     Supporte aussi la colonne 'Nom et Prénoms' combinée.
+    max_col : limite le scan pour éviter les fichiers avec 16384 colonnes vides.
     """
-    for r in range(1, 10):
+    sample_rows = list(ws_in.iter_rows(max_row=10, max_col=max_col, values_only=True))
+    for r_idx, sample_row in enumerate(sample_rows):
+        r = r_idx + 1
         mapping = {}
-        for c in range(1, ws_in.max_column+1):
-            h = normalize(str(ws_in.cell(row=r, column=c).value or ""))
+        for c_idx, val in enumerate(sample_row):
+            c = c_idx + 1
+            h = normalize(str(val or ""))
             for field, aliases in ALIASES.items():
                 if h in aliases:
                     mapping[field] = c
@@ -375,7 +389,7 @@ def detect_columns(ws_in):
         # Cas spécial : colonne combinée "Nom et Prénoms" ou "RESPONSABLE"
         if "nom_prenom" in mapping:
             mapping["nom"]    = mapping["nom_prenom"]
-            mapping["prenom"] = mapping["nom_prenom"]  # même colonne, sera splitée
+            mapping["prenom"] = mapping["nom_prenom"]
             mapping["_split_nom_prenom"] = True
             return mapping, r
     return {}, None
@@ -409,22 +423,54 @@ def integrate_file(filepath, filename, username=None):
         except Exception as e:
             return {"filename": filename, "error": f"Erreur lecture .xls : {e}"}
 
-    wb_in = load_workbook(filepath, data_only=True)
+    # ── Ouverture en mode lecture seule (x70 plus rapide pour les gros fichiers) ──
+    wb_in = load_workbook(filepath, data_only=True, read_only=True)
     ws_in = wb_in.active
-    col_map, header_row = detect_columns(ws_in)
+
+    # Détecter le vrai nombre de colonnes (certains fichiers ont 16384 cols vides)
+    MAX_COL_FILE = 15
+    for row in ws_in.iter_rows(max_row=10, values_only=True):
+        for i, v in enumerate(row):
+            if v is not None and i + 2 > MAX_COL_FILE:
+                MAX_COL_FILE = min(i + 5, 30)
+
+    # Mettre toutes les lignes en cache (évite les accès répétés sur le fichier)
+    all_input_rows = list(ws_in.iter_rows(max_col=MAX_COL_FILE, values_only=True))
+    wb_in.close()
+
+    def _cell(r, c):
+        """Accès cellule depuis le cache mémoire."""
+        if r < 1 or r > len(all_input_rows): return ""
+        row_data = all_input_rows[r - 1]
+        if c < 1 or c > len(row_data): return ""
+        return str(row_data[c - 1] or "").strip()
+
+    # Créer un objet factice pour detect_columns qui utilise le cache
+    class _WsProxy:
+        def iter_rows(self, max_row=None, max_col=None, values_only=True):
+            end = min(max_row, len(all_input_rows)) if max_row else len(all_input_rows)
+            for row in all_input_rows[:end]:
+                yield row[:max_col] if max_col else row
+        @property
+        def max_row(self): return len(all_input_rows)
+        @property
+        def max_column(self): return MAX_COL_FILE
+
+    ws_proxy = _WsProxy()
+    col_map, header_row = detect_columns(ws_proxy, max_col=MAX_COL_FILE)
     if not col_map:
         return {"filename": filename, "error": "Colonnes non detectees (Nom + Prenom requis)"}
 
     def gv(r, field):
         col = col_map.get(field)
-        return str(ws_in.cell(row=r, column=col).value or "").strip() if col else ""
+        return str(_cell(r, col)) if col else ""
 
     is_split = col_map.get("_split_nom_prenom", False)
 
     def find_tel(r, base_col):
         if not base_col: return ""
         for delta in [0, 1, -1, 2]:
-            v = str(ws_in.cell(row=r, column=base_col+delta).value or "").strip()
+            v = str(_cell(r, base_col+delta))
             if v and re.search(r"\d{5,}", v.replace(" ", "").replace("-","")):
                 return v
         return ""
@@ -433,12 +479,15 @@ def integrate_file(filepath, filename, username=None):
     alt_map = None
     if not is_split:
         alt_hits = 0
-        for r in range(header_row+1, min(header_row+60, ws_in.max_row+1)):
-            if not str(ws_in.cell(row=r, column=col_map.get("nom",99)).value or "").strip():
-                if str(ws_in.cell(row=r, column=col_map.get("nom",99)+1).value or "").strip():
+        nom_col = col_map.get("nom", 99)
+        if nom_col and nom_col <= MAX_COL_FILE:
+            for r_idx in range(header_row, min(header_row + 60, len(all_input_rows))):
+                nom_val  = _cell(r_idx + 1, nom_col)
+                nom1_val = _cell(r_idx + 1, nom_col + 1)
+                if not nom_val and nom1_val:
                     alt_hits += 1
         if alt_hits > 0:
-            alt_map = {f: c+1 for f, c in col_map.items() if not f.startswith("_")}
+            alt_map = {f: c+1 for f, c in col_map.items() if not f.startswith("_") and c < MAX_COL_FILE}
 
     def get_row_data(r):
         # ── Quartier ──────────────────────────────────────────────────────────
@@ -452,7 +501,7 @@ def integrate_file(filepath, filename, username=None):
             # Cas 7ème CE : quartier en col_nom-1 (col juste avant Nom et Prénoms)
             col_before = col_nom_val - 1
             if col_before >= 1:
-                v = str(ws_in.cell(row=r, column=col_before).value or "").strip()
+                v = str(_cell(r, col_before))
                 norm_v = normalize(v).upper()
                 if (v and norm_v not in [normalize(s) for s in skip]
                         and not re.match(r"^\d+$", v)
@@ -463,7 +512,7 @@ def integrate_file(filepath, filename, username=None):
             if not quartier and "quartier" in col_map:
                 col_q = col_map["quartier"]
                 for delta in [1, -1]:
-                    v = str(ws_in.cell(row=r, column=col_q+delta).value or "").strip()
+                    v = str(_cell(r, col_q+delta))
                     if v and normalize(v) not in [normalize(s) for s in skip] \
                             and not re.match(r"^\d+$", v):
                         quartier = v; break
@@ -497,10 +546,10 @@ def integrate_file(filepath, filename, username=None):
 
         # Alt_map : colonnes décalées si ligne principale vide
         if alt_map and not nom:
-            n2 = str(ws_in.cell(row=r, column=alt_map.get("nom",99)).value or "").strip()
+            n2 = str(_cell(r, alt_map.get("nom",99)))
             if n2:
-                q2 = str(ws_in.cell(row=r, column=alt_map.get("quartier",99)).value or "").strip()
-                p2 = str(ws_in.cell(row=r, column=alt_map.get("prenom",99)).value or "").strip()
+                q2 = str(_cell(r, alt_map.get("quartier",99)))
+                p2 = str(_cell(r, alt_map.get("prenom",99)))
                 if q2 and not quartier: quartier = q2
                 if not p2 and " " in n2:
                     nom, prenom = split_nom_prenom(n2)
@@ -521,10 +570,10 @@ def integrate_file(filepath, filename, username=None):
     last_dept_ctx   = None   # ← département courant du fichier source
     last_comm_ctx   = None   # ← commune courante du fichier source
 
-    for r in range(1, ws_in.max_row+1):
+    for r in range(1, len(all_input_rows) + 1):
         # Détecter DEPARTEMENT / COMMUNE / ARRONDISSEMENT dans le fichier source
-        for c in range(1, min(ws_in.max_column+1, 6)):
-            cv = str(ws_in.cell(row=r, column=c).value or "").strip()
+        for c in range(1, min(MAX_COL_FILE+1, 6)):
+            cv = str(_cell(r, c))
             cv_up = cv.upper()
             if "DEPARTEMENT" in cv_up:
                 last_dept_ctx = normalize(cv.replace("DEPARTEMENT:","").replace("DEPARTEMENT :","").strip())
@@ -534,12 +583,12 @@ def integrate_file(filepath, filename, username=None):
                 last_arrond_ctx = normalize(cv)
                 break
 
-        for c in range(1, min(ws_in.max_column+1, 6)):
-            cv = str(ws_in.cell(row=r, column=c).value or "").strip()
+        for c in range(1, min(MAX_COL_FILE+1, 6)):
+            cv = str(_cell(r, c))
             m = re.match(r"^QUARTIER\s*[:\-]\s*(.+)", cv, re.IGNORECASE)
             if m: last_quartier = m.group(1).strip(); break
             if re.match(r"^QUARTIER\s*[:\-]?\s*$", cv, re.IGNORECASE):
-                nxt = str(ws_in.cell(row=r, column=c+1).value or "").strip()
+                nxt = str(_cell(r, c+1))
                 if nxt: last_quartier = nxt
                 break
         if r < header_row+1: continue
@@ -548,11 +597,11 @@ def integrate_file(filepath, filename, username=None):
         if not any([quartier, nom, prenom, tel_raw]): continue
         if normalize(nom) in ["nom","noms","name"]: continue
         if normalize(prenom) in ["prenom","prenoms"]: continue
-        first_cell = str(ws_in.cell(row=r, column=1).value or "").strip()
+        first_cell = str(_cell(r, 1))
         if re.match(r"^QUARTIER\s*[:\-]", first_cell, re.IGNORECASE): continue
         skip_row = False
-        for c in range(1, min(ws_in.max_column+1, 4)):
-            cv = str(ws_in.cell(row=r, column=c).value or "").strip().upper()
+        for c in range(1, min(MAX_COL_FILE+1, 4)):
+            cv = str(_cell(r, c)).upper()
             if cv.startswith("DEPARTEMENT") or "ARRONDISSEMENT" in cv or cv.startswith("COMMUNE"):
                 skip_row = True; break
         if skip_row or not nom: continue
@@ -579,10 +628,12 @@ def integrate_file(filepath, filename, username=None):
                         "dept_ctx":   last_dept_ctx,
                         "comm_ctx":   last_comm_ctx})
 
+    _mere_max_row = 0  # sera défini dans le write_lock
     with write_lock:
         con    = get_db()
         wb_out = load_workbook(MERE_PATH)
         ws_out = wb_out.active
+        _mere_max_row = ws_out.max_row
         inserted = overflow = new_quartier = duplicates = 0
 
         # ── Phase 1 : Résoudre tous les placements AVANT toute écriture ──────
@@ -600,6 +651,75 @@ def integrate_file(filepath, filename, username=None):
 
         slot_fill_count = {}  # sid -> filled count courant
 
+        # ── Pré-charger les arronds en mémoire (évite 100s de requêtes SQL) ──
+        arrond_cache = {}
+        for row in con.execute(
+                "SELECT arrond_norm, dept_norm, comm_norm, last_data_row, next_dept_row, hdr_row "
+                "FROM arrond_index").fetchall():
+            an, dn, cn, ldr, ndr, hr = row
+            arrond_cache[an] = {"dept_norm": dn, "comm_norm": cn,
+                                "last_data_row": ldr, "next_dept_row": ndr, "hdr_row": hr}
+
+        # Pré-charger tous les slots en mémoire pour éviter les requêtes SQL répétées
+        all_slots_by_norm = {}  # village_norm -> list of slot rows
+        for row in con.execute(
+                "SELECT id,village,row_start,filled,last_data_row,arrond_norm,dept_norm,comm_norm "
+                "FROM slots").fetchall():
+            sid, village, row_start, filled, last_data_row, arrond_n, dept_n, comm_n = row
+            key = normalize(village)
+            if key not in all_slots_by_norm:
+                all_slots_by_norm[key] = []
+            all_slots_by_norm[key].append(
+                (sid, village, row_start, filled, last_data_row, arrond_n, dept_n, comm_n))
+
+        def find_slot_fast(quartier, arrond_ctx=None, dept_ctx=None, comm_ctx=None):
+            """Cherche un slot en mémoire (sans SQL) — beaucoup plus rapide."""
+            key = normalize(quartier)
+            candidates = all_slots_by_norm.get(key, [])
+            if not candidates:
+                if key not in _fuzzy_slot_cache:
+                    matches = difflib.get_close_matches(key, _all_slot_keys, n=1, cutoff=0.75)
+                    _fuzzy_slot_cache[key] = matches[0] if matches else None
+                fuzzy_key = _fuzzy_slot_cache[key]
+                if fuzzy_key:
+                    candidates = all_slots_by_norm.get(fuzzy_key, [])
+            if not candidates:
+                return None
+            # Niveau 1: dept + comm + arrond
+            if dept_ctx and comm_ctx and arrond_ctx:
+                for s in candidates:
+                    if s[5] == arrond_ctx and s[6] == dept_ctx and s[7] == comm_ctx:
+                        return s[:6]
+            # Niveau 2: arrond seul
+            if arrond_ctx:
+                for s in candidates:
+                    if s[5] == arrond_ctx:
+                        return s[:6]
+            # Niveau 3: global
+            return candidates[0][:6]
+
+        # Listes de clés pré-calculées pour fuzzy matching rapide
+        _all_slot_keys   = list(all_slots_by_norm.keys())
+        _all_arrond_keys = list(arrond_cache.keys())
+        _fuzzy_slot_cache   = {}   # key → matched key ou None
+        _fuzzy_arrond_cache = {}   # key → matched key ou None
+
+        def find_arrond_fast(arrond_ctx, dept_ctx=None, comm_ctx=None):
+            """Cherche un arrond en mémoire sans SQL."""
+            if not arrond_ctx: return None
+            if arrond_ctx in arrond_cache:
+                a = arrond_cache[arrond_ctx]
+                if not dept_ctx or a["dept_norm"] == dept_ctx:
+                    return (arrond_ctx, a["last_data_row"], a["next_dept_row"], a["hdr_row"])
+            if arrond_ctx not in _fuzzy_arrond_cache:
+                matches = difflib.get_close_matches(arrond_ctx, _all_arrond_keys, n=1, cutoff=0.80)
+                _fuzzy_arrond_cache[arrond_ctx] = matches[0] if matches else None
+            fuzzy_key = _fuzzy_arrond_cache[arrond_ctx]
+            if fuzzy_key:
+                a = arrond_cache[fuzzy_key]
+                return (fuzzy_key, a["last_data_row"], a["next_dept_row"], a["hdr_row"])
+            return None
+
         for p in persons:
             tel = p["tel_clean"]
             if con.execute("SELECT 1 FROM phones WHERE phone=?", (tel,)).fetchone():
@@ -611,10 +731,7 @@ def integrate_file(filepath, filename, username=None):
             arrond_ctx = p.get("arrond_ctx")
             dept_ctx   = p.get("dept_ctx")
             comm_ctx   = p.get("comm_ctx")
-            slot = find_slot(con, p["quartier"],
-                             arrond_norm_ctx=arrond_ctx,
-                             dept_norm_ctx=dept_ctx,
-                             comm_norm_ctx=comm_ctx)
+            slot = find_slot_fast(p["quartier"], arrond_ctx=arrond_ctx, dept_ctx=dept_ctx, comm_ctx=comm_ctx)
 
             if slot:
                 sid, village, row_start, filled, last_data_row, arrond_n = slot
@@ -640,22 +757,14 @@ def integrate_file(filepath, filename, username=None):
 
             else:
                 # ── Nouveau village → insérer à la fin de son arrondissement ──
-                insert_after = ws_out.max_row  # fallback = fin de fichier
+                insert_after = _mere_max_row   # fallback = fin de fichier (pré-calculé)
                 arrond_ctx = p.get("arrond_ctx")
                 dept_ctx   = p.get("dept_ctx")
                 comm_ctx   = p.get("comm_ctx")
 
                 if arrond_ctx:
-                    # Cherche l'arrond exact avec dept+comm pour éviter les homonymes
-                    arrond_info = None
-                    if dept_ctx and comm_ctx:
-                        row_ai = con.execute(
-                            "SELECT arrond_norm, last_data_row, next_dept_row, hdr_row "
-                            "FROM arrond_index WHERE arrond_norm=? AND dept_norm=? AND comm_norm=? LIMIT 1",
-                            (arrond_ctx, dept_ctx, comm_ctx)).fetchone()
-                        if row_ai: arrond_info = row_ai
-                    if not arrond_info:
-                        arrond_info = find_arrond_in_mere(con, arrond_ctx)
+                    # Cherche l'arrond en mémoire (sans SQL — beaucoup plus rapide)
+                    arrond_info = find_arrond_fast(arrond_ctx, dept_ctx, comm_ctx)
                     if arrond_info:
                         _, last_data, next_dept, hdr_row = arrond_info
                         insert_after = last_data  # juste après le dernier slot de l'arrond
@@ -674,26 +783,26 @@ def integrate_file(filepath, filename, username=None):
                     })
                 new_quartier += 1
                 phones_to_add.append(tel)
-                inserted += 1
-
-        # ── Phase 2 : Trier les insertions par position DÉCROISSANTE ─────────
-        # overflow_groups triés par insert_after DESC → bottom-to-top → pas de décalage
+                inserted += 1        # ── Phase 2 : Trier les insertions par position DÉCROISSANTE ─────────
         sorted_overflows = sorted(overflow_groups.values(), key=lambda g: g["insert_after"], reverse=True)
 
-        # ── Phase 3 : Styles helper ───────────────────────────────────────────
+        # ── Phase 3 : Styles pré-créés une seule fois (openpyxl est lent si recréés) ───
         from openpyxl.styles import PatternFill, Font, Alignment, Border, Side as Sd
-        thin2 = Sd(style="thin", color="CCCCCC")
-        bdr2  = Border(left=thin2, right=thin2, top=thin2, bottom=thin2)
+        _thin    = Sd(style="thin", color="CCCCCC")
+        _bdr     = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+        _fill    = PatternFill("solid", start_color=C_NEW)
+        _font    = Font(name="Arial", size=10)
+        _align_c = Alignment(horizontal="center", vertical="center")
+        _align_v = Alignment(vertical="center")
 
-        def style_inserted_row(ws, rn, bg=C_NEW):
+        def style_inserted_row(ws, rn):
             ws.row_dimensions[rn].height = 15
             for c in range(1, NCOLS+1):
-                cell = ws.cell(row=rn, column=c)
-                cell.fill      = PatternFill("solid", start_color=bg)
-                cell.font      = Font(name="Arial", size=10)
-                cell.border    = bdr2
-                cell.alignment = Alignment(vertical="center")
-            ws.cell(row=rn, column=1).alignment = Alignment(horizontal="center", vertical="center")
+                cell       = ws.cell(row=rn, column=c)
+                cell.fill  = _fill
+                cell.font  = _font
+                cell.border = _bdr
+                cell.alignment = _align_c if c == 1 else _align_v
 
         def write_to_row(ws, rn, num, village, p):
             ws.cell(row=rn, column=1).value = num
@@ -718,25 +827,27 @@ def integrate_file(filepath, filename, username=None):
 
             for i, p in enumerate(group["persons"]):
                 rn = insert_at + i
-                style_inserted_row(ws_out, rn)
-                write_to_row(ws_out, rn, start_num + i, village, p)
-
-        # ── Phase 5 : Nouveaux villages insérés à la bonne position ─────────
-        # Trier par insert_after DESC pour ne pas corrompre les positions
-        new_village_list.sort(key=lambda x: x["insert_after"], reverse=True)
-
+                write_to_row(ws_out, rn, start_num + i, village, p)        # ── Phase 5 : Nouveaux villages GROUPÉS par position ─────────────────
+        # Grouper les villages par insert_after → une seule insert_rows par groupe
+        from collections import defaultdict as _dd
+        _pos_groups = _dd(list)
         for nv in new_village_list:
-            count    = len(nv["persons"])
-            # insert_after = dernière ligne de données de l'arrond
-            # → insérer juste après = avant la prochaine DEPARTEMENT row
-            insert_at = nv["insert_after"] + 1
-            ws_out.insert_rows(insert_at, amount=count)
-            for i, p in enumerate(nv["persons"]):
-                rn = insert_at + i
-                style_inserted_row(ws_out, rn)
-                write_to_row(ws_out, rn, i + 1, nv["quartier"], p)
+            _pos_groups[nv["insert_after"]].append(nv)
 
-        # ── Phase 6 : Écriture directe sur slots existants ───────────────────
+        _nv_inserts = []  # (insert_at, total_count) pour adjust_row phase 6
+        # Traiter du bas vers le haut (positions DESC) pour éviter le décalage
+        for _pos in sorted(_pos_groups.keys(), reverse=True):
+            _villages_at_pos = _pos_groups[_pos]
+            _insert_at = _pos + 1
+            _total = sum(len(nv["persons"]) for nv in _villages_at_pos)
+            # UNE SEULE insert_rows pour toutes les villages de ce groupe
+            ws_out.insert_rows(_insert_at, amount=_total)
+            _nv_inserts.append((_insert_at, _total))
+            _cur = _insert_at
+            for nv in _villages_at_pos:
+                for i, p in enumerate(nv["persons"]):
+                    write_to_row(ws_out, _cur + i, i + 1, nv["quartier"], p)
+                _cur += len(nv["persons"])        # ── Phase 6 : Écriture directe sur slots existants ───────────────────
         # IMPORTANT : recalculer les positions après les insert_rows
         # Chaque insert_rows(pos, n) décale de +n toutes les lignes >= pos
         # On accumule les décalages pour corriger les positions directes
@@ -748,9 +859,13 @@ def integrate_file(filepath, filename, username=None):
             all_inserts.append((group["insert_after"] + 1, len(group["persons"])))
 
         def adjust_row(original_row):
-            """Recalcule la position d'une ligne après tous les insert_rows."""
+            """Recalcule la position après tous les insert_rows (overflow + nouveaux villages)."""
             adjusted = original_row
             for insert_at, count in all_inserts:
+                if insert_at <= adjusted:
+                    adjusted += count
+            # Aussi ajuster pour les insertions de nouveaux villages
+            for insert_at, count in _nv_inserts:
                 if insert_at <= adjusted:
                     adjusted += count
             return adjusted
@@ -765,14 +880,12 @@ def integrate_file(filepath, filename, username=None):
             ws_out.cell(row=adjusted_row, column=8).value = p.get("lieu_naissance","")
             ws_out.cell(row=adjusted_row, column=9).value = p["telephone"]
 
-        # ── Phase 7 : Téléphones + invalider cache ────────────────────────────
+        # ── Phase 7 : Téléphones (pas d'invalidation ici — on le fait après) ──
         for tel in phones_to_add:
             con.execute("INSERT OR IGNORE INTO phones VALUES(?)", (tel,))
-        invalidate_db()
 
         con.commit()
         wb_out.save(MERE_PATH)
-
     log = load_log()
     log["total_inserted"] = log.get("total_inserted", 0) + inserted
     if "users" not in log: log["users"] = {}
@@ -794,13 +907,16 @@ def integrate_file(filepath, filename, username=None):
         "user": uname,
     })
     save_log(log)
-    con2 = get_db()
-    total_personnes = con2.execute("SELECT SUM(filled) FROM slots").fetchone()[0] or 0
+    # Invalider + reconstruire l'index UNE seule fois si nécessaire
+    if inserted > 0 or new_quartier > 0:
+        invalidate_db()
+    con_final = get_db()
+    total_personnes = con_final.execute("SELECT SUM(filled) FROM slots").fetchone()[0] or 0
     return {
         "filename": filename, "inserted": inserted, "overflow": overflow,
         "new_quartiers": new_quartier, "duplicates": duplicates,
         "rejected_count": len(rejected), "rejected": rejected[:50],
-        "total_mere": ws_out.max_row, "total_personnes": total_personnes,
+        "total_mere": _mere_max_row, "total_personnes": total_personnes,
         "total_cumule": log["total_inserted"],
     }
 
@@ -983,7 +1099,7 @@ def reset():
         count = 0
         ORIGINAL_MAX = 28088
         for r in range(1, min(ORIGINAL_MAX+1, ws.max_row+1)):
-            if str(ws.cell(row=r, column=1).value or "").strip() in ["1","2","3","4","5"]:
+            if str(ws.cell(row=r, column=1)) in ["1","2","3","4","5"]:
                 for c in range(3, 10):
                     ws.cell(row=r, column=c).value = None
                 count += 1
