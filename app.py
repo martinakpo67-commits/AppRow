@@ -1050,7 +1050,7 @@ def download():
 def stats():
     log = load_log()
     con = get_db()
-    total_personnes = con.execute("SELECT SUM(filled) FROM slots").fetchone()[0] or 0
+    total_personnes = con.execute("SELECT COUNT(*) FROM phones").fetchone()[0] or 0
     wb = load_workbook(MERE_PATH, read_only=True)
     ws = wb.active
     total_lignes = ws.max_row
