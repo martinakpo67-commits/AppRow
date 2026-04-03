@@ -1069,6 +1069,8 @@ def admin_panel_page():
     return render_template("admin.html")
 
 
+@app.route("/admin/stats")
+@require_admin
 def admin_stats():
     """Stats complètes par utilisateur pour l'admin."""
     log = load_log()
