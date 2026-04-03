@@ -8,10 +8,13 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
-app.config["SESSION_COOKIE_SECURE"]   = False
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_NAME"]     = "approw_session"
+app.config["SESSION_COOKIE_SECURE"]    = False
+app.config["SESSION_COOKIE_SAMESITE"]  = "Lax"
+app.config["SESSION_COOKIE_HTTPONLY"]  = True
+app.config["SESSION_COOKIE_NAME"]      = "approw_session"
+app.config["SESSION_COOKIE_DOMAIN"]    = None
+app.config["PERMANENT_SESSION_LIFETIME"] = 86400 * 30  # 30 jours
+app.config["SESSION_PERMANENT"]         = True
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 
@@ -991,6 +994,7 @@ def login():
         if username.lower() in ["admin","administrateur"]:
             session["role"] = "admin"
             session["username"] = "admin"
+            session.permanent = True
             return jsonify({"ok": True, "role": "admin"})
 
     # Check regular user
@@ -998,6 +1002,7 @@ def login():
         session["username"] = username.lower().strip()
         session["display"]  = get_user(username)["display"]
         session["role"]     = "user"
+        session.permanent   = True
         return jsonify({"ok": True, "role": "user"})
 
     return jsonify({"ok": False, "error": "Identifiants incorrects"}), 401
