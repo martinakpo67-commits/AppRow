@@ -24,12 +24,17 @@ USERS_PATH = os.path.join(DATA_DIR, "users.json")
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ── Si mere.xlsx absent dans DATA_DIR, copier depuis BASE_DIR (premier démarrage) ──
+# ── Synchroniser mere.xlsx depuis BASE_DIR vers DATA_DIR si plus récent ou absent ──
 _mere_src = os.path.join(BASE_DIR, "mere.xlsx")
-if not os.path.exists(MERE_PATH) and os.path.exists(_mere_src):
-    import shutil
-    shutil.copy2(_mere_src, MERE_PATH)
-    print(f"✅ mere.xlsx copié vers {DATA_DIR}", flush=True)
+if os.path.exists(_mere_src):
+    import shutil as _shutil
+    _should_copy = not os.path.exists(MERE_PATH)
+    if not _should_copy:
+        # Copier si le fichier source est plus grand (plus de données)
+        _should_copy = os.path.getsize(_mere_src) > os.path.getsize(MERE_PATH)
+    if _should_copy:
+        _shutil.copy2(_mere_src, MERE_PATH)
+        print(f"✅ mere.xlsx synchronisé vers {DATA_DIR} ({os.path.getsize(MERE_PATH)//1024} Ko)", flush=True)
 
 # Admin password (set via Railway env var ADMIN_PASSWORD)
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin2026")
