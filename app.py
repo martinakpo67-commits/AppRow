@@ -14,11 +14,22 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_NAME"]     = "approw_session"
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-MERE_PATH  = os.path.join(BASE_DIR, "mere.xlsx")
-LOG_PATH   = os.path.join(BASE_DIR, "log.json")
-USERS_PATH = os.path.join(BASE_DIR, "users.json")
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+
+# ── Stockage persistant : utilise /data si dispo (Railway Volume), sinon BASE_DIR ──
+DATA_DIR = "/data" if os.path.isdir("/data") else BASE_DIR
+
+MERE_PATH  = os.path.join(DATA_DIR, "mere.xlsx")
+LOG_PATH   = os.path.join(DATA_DIR, "log.json")
+USERS_PATH = os.path.join(DATA_DIR, "users.json")
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# ── Si mere.xlsx absent dans DATA_DIR, copier depuis BASE_DIR (premier démarrage) ──
+_mere_src = os.path.join(BASE_DIR, "mere.xlsx")
+if not os.path.exists(MERE_PATH) and os.path.exists(_mere_src):
+    import shutil
+    shutil.copy2(_mere_src, MERE_PATH)
+    print(f"✅ mere.xlsx copié vers {DATA_DIR}", flush=True)
 
 # Admin password (set via Railway env var ADMIN_PASSWORD)
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin2026")
