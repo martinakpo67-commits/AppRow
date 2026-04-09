@@ -56,12 +56,27 @@ def strip_accents(s):
 
 def normalize(s):
     s = strip_accents(s)
-    return re.sub(r"[-_\s\'\u2019\u2018]+", " ", s).strip()
+    s = re.sub(r"[-_\s'\u2019\u2018]+", " ", s).strip()
+    # Normaliser les espaces autour des deux-points
+    # ex: "ARROND : LIBANTE" → "ARROND: LIBANTE" (harmonise les fichiers sources variés)
+    s = re.sub(r"\s*:\s*", ": ", s)
+    return s
 
 def clean_phone(p):
-    # Supprime espaces, tirets, points, parenthèses ET étoiles (*01..., *56...)
-    p = re.sub(r"[\s\-\.\(\)\*]+", "", str(p or ""))
-    return re.sub(r"^\+229|^00229", "", p).strip()
+    # Convertir les entiers Excel (ex: 51620902) en string propre
+    if isinstance(p, (int, float)):
+        p = str(int(p))
+    # Supprime espaces, tirets, points, parenthèses, étoiles ET deux-points
+    p = re.sub(r"[\s\-\.\(\)\*\:]+", "", str(p or ""))
+    # Supprimer indicatifs internationaux connus
+    p = re.sub(r"^\+229|^00229", "", p)
+    # Supprimer préfixe parasite "01" (ex: 010148836267 → 0148836267)
+    # uniquement si le résultat est un numéro valide de 8-10 chiffres
+    if re.match(r"^01\d{10,}$", p):
+        candidate = p[2:]
+        if re.match(r"^\d{8,10}$", candidate):
+            p = candidate
+    return p.strip()
 
 def load_log():
     if os.path.exists(LOG_PATH):
@@ -377,7 +392,8 @@ ALIASES = {
                        "villages / quartiers de ville"],
     "nom":            ["nom","noms","name"],
     "prenom":         ["prenom","prenoms","firstname"],
-    "nom_prenom":     ["nom et prenoms","nom et prenom","noms et prenoms","responsable"],
+    "nom_prenom":     ["nom et prenoms","nom et prenom","noms et prenoms","responsable",
+                       "membres","membre","nom complet","noms complets"],  # + Djidja
     "telephone":      ["telephone","tel","phone","mobile","contact",
                        "numero de telephone","numero",
                        "adresse complete","adresse complete","adresse",
@@ -406,7 +422,7 @@ def detect_columns(ws_in, max_col=30):
     Supporte aussi la colonne 'Nom et Prénoms' combinée.
     max_col : limite le scan pour éviter les fichiers avec 16384 colonnes vides.
     """
-    sample_rows = list(ws_in.iter_rows(max_row=10, max_col=max_col, values_only=True))
+    sample_rows = list(ws_in.iter_rows(max_row=15, max_col=max_col, values_only=True))
     for r_idx, sample_row in enumerate(sample_rows):
         r = r_idx + 1
         mapping = {}
@@ -419,12 +435,25 @@ def detect_columns(ws_in, max_col=30):
         # Cas normal : nom + prenom séparés
         if "nom" in mapping and "prenom" in mapping:
             return mapping, r
-        # Cas spécial : colonne combinée "Nom et Prénoms" ou "RESPONSABLE"
+        # Cas spécial : colonne combinée "Nom et Prénoms", "MEMBRES", etc.
         if "nom_prenom" in mapping:
             mapping["nom"]    = mapping["nom_prenom"]
             mapping["prenom"] = mapping["nom_prenom"]
             mapping["_split_nom_prenom"] = True
             return mapping, r
+        # Cas Segbana : l'entête de col 2 est un nom propre (ex: "SEGOUDA RAZAK")
+        # → si col 1 = N°  ET  col 3 = TELEPHONE  on infère col 2 = nom_prenom
+        if len(sample_row) >= 3:
+            h1 = normalize(str(sample_row[0] or ""))
+            h3 = normalize(str(sample_row[2] or ""))
+            h2 = str(sample_row[1] or "").strip()
+            if h1 in ["n°","n","no","num","numero"] and \
+               h3 in ["telephone","tel","contact","phone"] and h2:
+                mapping["nom"]       = 2
+                mapping["prenom"]    = 2
+                mapping["telephone"] = 3
+                mapping["_split_nom_prenom"] = True
+                return mapping, r
     return {}, None
 
 def integrate_file(filepath, filename, username=None):
@@ -532,8 +561,10 @@ def integrate_file(filepath, filename, username=None):
                     "QUARTIER","QUARTIERS","N° QUARTIERS",""}
 
             # Cas 7ème CE : quartier en col_nom-1 (col juste avant Nom et Prénoms)
+            # SAUF si col_nom-1 est déjà la colonne quartier (format Djidja)
             col_before = col_nom_val - 1
-            if col_before >= 1:
+            q_col_map = col_map.get("quartier", 0)
+            if col_before >= 1 and col_before != q_col_map:
                 v = str(_cell(r, col_before))
                 norm_v = normalize(v).upper()
                 if (v and norm_v not in [normalize(s) for s in skip]
@@ -541,11 +572,16 @@ def integrate_file(filepath, filename, username=None):
                         and len(v) > 1):
                     quartier = v
 
-            # Cas général : chercher aussi col_quartier±1
+            # Cas général : chercher col_quartier±1
+            # Ne pas lire la colonne nom comme quartier (format Djidja : colonnes adjacentes)
             if not quartier and "quartier" in col_map:
                 col_q = col_map["quartier"]
+                nom_col = col_map.get("nom", col_map.get("nom_prenom", 99))
                 for delta in [1, -1]:
-                    v = str(_cell(r, col_q+delta))
+                    target_col = col_q + delta
+                    if target_col == nom_col:   # éviter de prendre le nom comme quartier
+                        continue
+                    v = str(_cell(r, target_col))
                     if v and normalize(v) not in [normalize(s) for s in skip] \
                             and not re.match(r"^\d+$", v):
                         quartier = v; break
@@ -603,6 +639,9 @@ def integrate_file(filepath, filename, username=None):
     last_dept_ctx   = None   # ← département courant du fichier source
     last_comm_ctx   = None   # ← commune courante du fichier source
 
+    # Colonne quartier/village dans l'entête (pour propagation verticale — format Djidja)
+    _q_col = col_map.get("quartier")
+
     for r in range(1, len(all_input_rows) + 1):
         # Détecter DEPARTEMENT / COMMUNE / ARRONDISSEMENT dans le fichier source
         for c in range(1, min(MAX_COL_FILE+1, 6)):
@@ -616,6 +655,22 @@ def integrate_file(filepath, filename, username=None):
                 last_arrond_ctx = normalize(cv)
                 break
 
+        # ── Détecter VILLAGE DE xxx / N:NOM (format Segbana) ──────────────────
+        for c in range(1, min(MAX_COL_FILE+1, 4)):
+            cv = str(_cell(r, c))
+            # "VILLAGE DE LIBANTE" ou "VILLAGE : LIBANTE"
+            m = re.match(r"^VILLAGE\s*(?:DE|:|-|DU)?\s*(.+)", cv, re.IGNORECASE)
+            if m:
+                vname = m.group(1).strip()
+                if vname and not re.match(r"^[A-Z]\s*$", vname):  # éviter "VILLAGE D"
+                    last_quartier = vname; break
+            # "2:BOBENA" ou "3: SAONZI" (numéro:nom sans le mot ARRONDISSEMENT)
+            m2 = re.match(r"^\d+\s*[:\-]\s*(.+)", cv)
+            if m2:
+                vname2 = m2.group(1).strip()
+                if vname2 and "ARRONDISSEMENT" not in vname2.upper():
+                    last_quartier = vname2; break
+
         for c in range(1, min(MAX_COL_FILE+1, 6)):
             cv = str(_cell(r, c))
             m = re.match(r"^QUARTIER\s*[:\-]\s*(.+)", cv, re.IGNORECASE)
@@ -624,11 +679,38 @@ def integrate_file(filepath, filename, username=None):
                 nxt = str(_cell(r, c+1))
                 if nxt: last_quartier = nxt
                 break
+
+        # ── Propagation verticale village (format Djidja : col village remplie 1 ligne / N) ──
+        # Met à jour last_quartier seulement si la cellule est non-vide et non-entête
+        if _q_col:
+            qv = str(_cell(r, _q_col))
+            if qv and normalize(qv) not in ["village","quartier",
+                                            "villages / quartiers de ville",
+                                            "arrondissement","n°","n",""]:
+                last_quartier = qv
+
+        # ── Propagation arrondissement depuis col 1 (format Djidja) ───────────
+        # Dans Djidja col 1 contient l'arrond sur la 1ère ligne du bloc seulement
+        # On le récupère quand : col1 non-vide, col_nom vide, et la col quartier > 1
+        if _q_col and _q_col > 1 and r >= header_row:
+            c1v = str(_cell(r, 1))
+            nom_col_val = str(_cell(r, col_map.get("nom", col_map.get("nom_prenom", 99))))
+            if c1v and not nom_col_val \
+                    and "ARRONDISSEMENT" not in c1v.upper() \
+                    and "DEPARTEMENT"    not in c1v.upper() \
+                    and "COMMUNE"        not in c1v.upper() \
+                    and "LISTE"          not in c1v.upper() \
+                    and col_map.get("nom", 99) != 1 \
+                    and col_map.get("nom_prenom", 99) != 1:
+                last_arrond_ctx = normalize(c1v)
+
         if r < header_row+1: continue
         quartier, nom, prenom, tel_raw, extras = get_row_data(r)
         tel = clean_phone(tel_raw)
         if not any([quartier, nom, prenom, tel_raw]): continue
-        if normalize(nom) in ["nom","noms","name"]: continue
+        if normalize(nom) in ["nom","noms","name",
+                               "membres","membre","nom et prenoms","noms et prenoms",
+                               "nom complet"]: continue
         if normalize(prenom) in ["prenom","prenoms"]: continue
         first_cell = str(_cell(r, 1))
         if re.match(r"^QUARTIER\s*[:\-]", first_cell, re.IGNORECASE): continue
@@ -638,6 +720,12 @@ def integrate_file(filepath, filename, username=None):
             if cv.startswith("DEPARTEMENT") or "ARRONDISSEMENT" in cv or cv.startswith("COMMUNE"):
                 skip_row = True; break
         if skip_row or not nom: continue
+        # Ignorer lignes de titre répétées (ex: "LISTE DE DJIDJA", "VILLAGE DE xxx")
+        if re.match(r"^(LISTE|VILLAGE\s+DE|VILLAGE\s*:)", first_cell, re.IGNORECASE): continue
+        # Ignorer entêtes répétés (ex: ligne "Arrondissement | Village | MEMBRES | Contact")
+        if normalize(nom) in ["nom","noms","membres","membre","nom et prenoms",
+                               "noms et prenoms","nom complet","contact","telephone","tel"]: continue
+        if normalize(first_cell) in ["arrondissement","n°","no","num","numero"]: continue
         if quartier: last_quartier = quartier
         elif not quartier and nom and (prenom or tel):
             if last_quartier: quartier = last_quartier
